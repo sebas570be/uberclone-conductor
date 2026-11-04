@@ -4,7 +4,7 @@
 // errores de decimales como 0.1 + 0.2 = 0.30000000000000004.
 // Cambiar un valor aquí cambia la estimación Y el cobro final, porque ambos
 // usan calculateFare (src/utils/calculateFare.js).
-// AI-assisted: see docs/AI_LOG.md #3
+// AI-assisted: see docs/AI_LOG.md #1
 
 export const PRICING = Object.freeze({
   baseFare: 3500, // COP que se cobran al iniciar cualquier viaje

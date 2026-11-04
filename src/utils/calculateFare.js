@@ -3,8 +3,16 @@
 // Es una función pura: con los mismos datos siempre da el mismo resultado
 // y no toca red, estado ni base de datos. Por eso se puede probar con Jest.
 // Se usa en la estimación de la solicitud Y en el cobro final del viaje.
-// AI-assisted: see docs/AI_LOG.md #3
+// AI-assisted: see docs/AI_LOG.md #1
 import { PRICING } from '../config/pricing';
+
+// Un monto válido es un número de verdad (typeof 'number'), finito
+// (no NaN ni Infinity) y no negativo. Ojo: '5' >= 0 da true porque
+// JavaScript convierte el texto a número al comparar, por eso no basta con >= 0.
+// La regla "un viaje debe tener distancia mayor a 0" NO va aquí: se valida en
+// el service al crear la solicitud (esta función solo calcula cuánto cuesta).
+const isValidAmount = (value) =>
+  typeof value === 'number' && Number.isFinite(value) && value >= 0;
 
 export function calculateFare({ distanceKm, durationMin, category, tip = 0 }) {
   // 1. Validar datos de entrada: un dato inválido es un error del sistema,
@@ -13,8 +21,7 @@ export function calculateFare({ distanceKm, durationMin, category, tip = 0 }) {
   if (multiplier === undefined) {
     throw new Error(`Categoría desconocida: ${category}`);
   }
-  // !(x >= 0) también atrapa undefined, null, NaN y textos
-  if (!(distanceKm >= 0) || !(durationMin >= 0) || !(tip >= 0)) {
+  if (!isValidAmount(distanceKm) || !isValidAmount(durationMin) || !isValidAmount(tip)) {
     throw new Error('Distancia, duración y propina deben ser números mayores o iguales a 0');
   }
 
