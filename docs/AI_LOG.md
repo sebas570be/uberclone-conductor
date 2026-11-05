@@ -57,3 +57,15 @@ Regla: nunca se pegan en un prompt llaves de API, access_token ni datos personal
 - Archivos y commit: src/utils/calculateFare.js, src/config/pricing.js — ab1b000
 - Verificación: Pruebas unitarias con Jest (jest-expo) en src/utils/__tests__/calculateFare.test.js — commit 9140383. `npm test`: 4 passed de 4. Comprueban el ejemplo del enunciado (8,5 km y 22 min: Económico 19.200 / 3.840 / 15.360 y XL 26.900 / 5.380 / 21.520) y que la función rechaza una distancia en texto ('5') y una propina en texto ('1000').
 - Aprendizaje: Mantener las funciones de cálculo puras y estrictas en cuanto a tipos de datos previene errores silenciosos de concatenación, delegando las reglas de negocio de flujos operativos hacia las capas superiores correspondientes.
+
+### Entrada #2
+- Fecha: 2026-11-04
+- Integrante: Fray Sebastián Benítez Rodríguez
+- Herramienta: Claude
+- Objetivo: Obtener un análisis detallado del enunciado del proyecto (requisitos, flujo, módulos, modelo de datos, criterios de evaluación, dificultades e inconsistencias) antes de continuar con el desarrollo.
+- Prompt: "Yo quiero antes de seguir, poner en el uso de IA toda la evaluacion del proyecto, como lo hace notebook lm no se si me hago entender" — "Lo que quiero es que yo le cargue el proyecto y el me haga una analicis y un plan de trabajo" — "o damelo tu, da lo mismo, pasamelo tu y lo pones en la bitacora" — "pero quiero un analisis primero del trabajo no de como voy" — "mas detalle y ya dame la bitacora para ponerlo como bitacora #2"
+- Resumen de la respuesta: Análisis del enunciado en 16 secciones: flujo completo y estados del viaje, los 22 campos del registro con sus reglas de validación, pantallas, hooks obligatorios, flujo de pago con backend, fórmula de tarifa, historial y modelo de datos, APIs con sus equivalentes en Expo Go, criterios de evaluación de la concertación, dificultades técnicas y 13 vacíos o inconsistencias del enunciado con una resolución propuesta.
+- Qué se usó / modificó / descartó: Se usó el análisis completo como guía de estudio y de desarrollo; se guardó fuera del repositorio porque es material de estudio personal. Se pidió una primera versión que se descartó por hablar del avance del proyecto y no del enunciado, y se pidió más detalle en la segunda. Se descartó usar NotebookLM para este análisis. El plan de trabajo quedó para una sesión posterior, después del análisis.
+- Archivos y commit: Ninguno (análisis previo, sin cambios en el repositorio)
+- Verificación: Cada sección se contrastó con el enunciado (§1–§9), la concertación de evaluación del grupo 003, el microcurrículo y el instructivo de la bitácora.
+- Aprendizaje: Analizar el enunciado completo antes de programar permite ver cómo se conectan los módulos (registro, solicitudes, viaje, pago e historial), identificar las partes más difíciles y detectar a tiempo requisitos que no funcionan en Expo Go o que dependen de APIs que Google ya no habilita.
