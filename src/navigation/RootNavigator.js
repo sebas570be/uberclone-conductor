@@ -10,6 +10,7 @@ import { DRIVER_STATUS } from '../context/SessionContext';
 import RegisterTabs from './RegisterTabs';
 import MainDrawer from './MainDrawer';
 import PlaceholderScreen from '../components/PlaceholderScreen';
+import LoginScreen from '../screens/auth/LoginScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -19,11 +20,7 @@ export default function RootNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {driverStatus === DRIVER_STATUS.SIGNED_OUT && (
-        <Stack.Screen
-          name="Login"
-          component={PlaceholderScreen}
-          options={{ headerShown: true, title: 'Iniciar sesión' }}
-        />
+        <Stack.Screen name="Login" component={LoginScreen} />
       )}
       {driverStatus === DRIVER_STATUS.UNREGISTERED && (
         <Stack.Screen name="Register" component={RegisterTabs} />
