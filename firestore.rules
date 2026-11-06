@@ -1,0 +1,38 @@
+rules_version = '2';
+
+// Reglas de seguridad de Cloud Firestore (UberClone - Versión Conductor).
+// Se publican en: Consola de Firebase → Firestore Database → Reglas.
+// Este archivo es la copia versionada: si cambian las reglas, se cambia aquí
+// y se vuelve a publicar en la consola.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Documento de cada conductor: drivers/{uid}
+    match /drivers/{driverId} {
+
+      // Solo el propio conductor, con sesión iniciada, puede leer su documento.
+      allow read: if request.auth != null
+                  && request.auth.uid == driverId;
+
+      // Al enviar el registro: solo su propio documento y SIEMPRE como "pending".
+      // Así nadie puede crearse ya aprobado desde la app.
+      allow create: if request.auth != null
+                    && request.auth.uid == driverId
+                    && request.resource.data.status == 'pending';
+
+      // Editar su perfil: puede cambiar sus datos, pero NO su estado.
+      // La aprobación se hace desde la consola (simulada en la BD, como dice el enunciado).
+      allow update: if request.auth != null
+                    && request.auth.uid == driverId
+                    && request.resource.data.status == resource.data.status;
+
+      // Cancelar el registro (el Delete del CRUD): solo mientras está pendiente.
+      allow delete: if request.auth != null
+                    && request.auth.uid == driverId
+                    && resource.data.status == 'pending';
+    }
+
+    // Todo lo demás (por ejemplo, "trips") sigue cerrado hasta su rama:
+    // lo que no está permitido explícitamente queda prohibido.
+  }
+}

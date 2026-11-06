@@ -396,3 +396,247 @@ Ya monté el esqueleto de navegación que revisamos y lo probé en mi iPhone con
 - Archivos y commit: src/context/SessionContext.js, src/hooks/useSession.js — bcf342e · src/components/PlaceholderScreen.js, src/navigation/RegisterTabs.js, src/navigation/TripStack.js, src/navigation/MainDrawer.js — a639984 · src/navigation/RootNavigator.js, App.js, docs/capturas/04 a 11 — d3f28cf
 - Verificación: Prueba en iPhone con Expo Go de los 4 estados (approved, pending, unregistered, signedOut) cambiando INITIAL_STATUS: cada estado muestra solo su rama y en "Solicitud" el menú no se puede abrir (capturas 04 a 11). `npm test`: 4 passed. Revisión del código con Gemini.
 - Aprendizaje: El enunciado dice qué navegador usar, pero no cómo anidarlos; decidir la raíz por el estado del conductor hace que un conductor no aprobado ni siquiera tenga montado el menú. Aprendí a no aceptar todo lo que dice la IA: el Drawer no se bloquea solo, una respuesta de Gemini era de otra conversación y su revisión no consideró el botón atrás de Android. De aquí en adelante le pido revisiones críticas, no aprobación.
+
+### Entrada #4
+- Fecha: 2026-11-06
+- Integrante: Fray Sebastián Benítez Rodríguez
+- Herramienta: Claude
+- Objetivo: Configurar Firebase paso a paso para el proyecto: crear el proyecto en la consola, registrar la app web, guardar la configuración en variables de entorno, activar Authentication y crear Firestore, e instalar el SDK de Firebase.
+- Prompt: "entonces vamos a paso paso con el firebase" — "este paso no lo entiendo" (sobre la instrucción de crear el archivo .env) — "y que nombre le pong al .env ?" — "[configuración web de Firebase pegada desde la consola; valores omitidos] dame el que debo poner entonces en el visaul" — "listo guardado" — "entonces de aqui que ?" — "confirmada la ubicaicon que dices" — "Listo acabo de crear la rama y abajo te epgo la salida del install firebase"
+- Resumen de la respuesta: Guía paso a paso para crear el proyecto `uberclone-conductor` en el plan Spark, registrar la app web, pasar los 6 valores del `firebaseConfig` a un archivo `.env` con variables `EXPO_PUBLIC_FIREBASE_*`, activar el acceso con correo y contraseña, crear Firestore en `southamerica-east1` en modo de producción e instalar el SDK con `npx expo install firebase`.
+- Qué se usó / modificó / descartó: Se usaron todos los pasos. Se modificó el `.env`: la primera vez se copiaron los valores de ejemplo en lugar de los reales y se corrigió con la configuración del proyecto. Se descartó el comando `npm install firebase` que muestra la consola (se usó `npx expo install`), Google Analytics, Gemini en Firebase, "Acceder con Google", la autenticación de varios factores, el plan Blaze y el modo de prueba de Firestore (se eligió modo de producción para que la base no quede abierta).
+- Archivos y commit: package.json, package-lock.json (firebase 13.2.0), src/config/firebase.js, .env.example — 85b63da. El archivo .env no se sube al repositorio (está en el .gitignore)
+- Verificación: Revisión del .env en el PC: las 6 variables con el nombre exacto y los valores del proyecto, sin valores de ejemplo. `git status` limpio, lo que confirma que el .env está ignorado. En la consola: Correo electrónico/contraseña "Habilitada" y reglas de Firestore `allow read, write: if false;`. En la instalación, Expo mostró `env: load .env` con las 6 variables cargadas.
+- Aprendizaje: La configuración web de Firebase no es secreta (la seguridad la dan las reglas de Firestore), pero igual se guarda en un .env para no dejarla fija en el código; Expo solo expone a la app las variables con prefijo `EXPO_PUBLIC_`. Elegir modo de producción en Firestore obliga a escribir reglas antes de usar la base, pero evita dejar los datos abiertos.
+
+### Entrada #5
+- Fecha: 2026-11-06
+- Integrante: Fray Sebastián Benítez Rodríguez
+- Herramienta: Gemini
+- Objetivo: Decidir dónde guardar la sesión de Firebase Authentication (AsyncStorage o SecureStore) para que el conductor no tenga que iniciar sesión cada vez que abre la app.
+- Prompt: "Sigo con mi UberClone versión conductor (Expo SDK 58, JavaScript, Expo Go en iPhone, Firebase JS SDK 13.2). Voy a agregar Firebase Authentication con correo y contraseña.
+
+  Tengo que decidir dónde se guarda la sesión del usuario para que no tenga que iniciar sesión cada vez que abre la app:
+
+  (a) La forma que documenta Expo: initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) }), con @react-native-async-storage/async-storage. El token de renovación de Firebase queda en AsyncStorage, que no está cifrado.
+
+  (b) expo-secure-store (cifrado), escribiendo un adaptador propio con getItem/setItem/removeItem para pasárselo a getReactNativePersistence. Las reglas de mi curso dicen que los tokens van en SecureStore. Pero SecureStore no acepta ":" en las claves (Firebase usa claves como "firebase:authUser:...") y avisa con valores de más de 2048 bytes.
+
+  Mis dudas:
+  1. ¿Cuál es más correcta para un proyecto académico que se evalúa en seguridad? ¿El riesgo de (a) es real en un celular?
+  2. Si elijo (b), ¿qué puede fallar con el adaptador (claves, tamaño, Android vs iOS)?
+  3. ¿Hay una opción (c) mejor que no esté viendo?
+
+  No me digas que está bien si no lo está. Busca errores, casos que fallen (Android e iOS) y lo que haría distinto un desarrollador senior. No me sugieras librerías fuera de Expo."
+- Resumen de la respuesta: Gemini consideró (b) la más correcta frente a la regla del curso y confirmó que el riesgo de (a) es real en dispositivos con root, jailbreak o respaldos sin cifrar. Advirtió que (b) choca con las claves con ":" y el límite de 2048 bytes de SecureStore, y propuso como alternativa mantener la sesión en memoria o usar (a) con una justificación documentada.
+- Qué se usó / modificó / descartó: Se usó la opción (a) con la justificación documentada en el código. Se corrigieron afirmaciones de Gemini: el almacenamiento de AsyncStorage es SQLite en Android y archivos en iOS (no al revés), y el límite de 2048 bytes hoy solo genera una advertencia. Se descartaron `react-native-mmkv` y `NSFileProtectionComplete` (no funcionan en Expo Go) y la sesión en memoria (obliga a iniciar sesión cada vez). Gemini no consideró que (b) se puede resolver dividiendo el valor en pedazos; queda como mejora si se necesita.
+- Archivos y commit: src/config/firebase.js (inicialización de auth con persistencia), src/services/authService.js, src/screens/auth/LoginScreen.js, src/utils/validators.js — b66047a
+- Verificación: En el iPhone se creó una cuenta, se inició sesión, se probó un correo repetido y una contraseña equivocada (capturas 12 a 16); las cuentas aparecen en la consola de Firebase, Authentication → Usuarios (captura 17). `npm test`: 7 passed.
+- Aprendizaje: Guardar la sesión implica decidir entre seguridad y estabilidad: SecureStore cifra, pero Firebase guarda valores que superan su límite. El enunciado permite la sesión en AsyncStorage y la regla del curso pide SecureStore; documentar esa diferencia es parte de la decisión. También aprendí a contrastar la respuesta de la IA: Gemini se contradijo y sugirió librerías que no funcionan en Expo Go.
+
+### Entrada #6
+- Fecha: 2026-11-06
+- Integrante: Fray Sebastián Benítez Rodríguez
+- Herramienta: Gemini
+- Objetivo: Revisar de forma crítica el SessionContext conectado a Firebase (onAuthStateChanged + onSnapshot de drivers/{uid}) antes de hacer el commit: cierre de las escuchas, errores al cerrar sesión, carga sin internet y la decisión de tratar cualquier status distinto de "approved" como "pending".
+- Prompt: "Sigo con mi UberClone versión conductor (Expo SDK 58, JavaScript, Expo Go en iPhone, React Navigation 7, Firebase JS SDK 13 con la sesión guardada en AsyncStorage). Ya tengo inicio de sesión con correo y contraseña y reglas de Firestore donde cada conductor solo lee su documento drivers/{uid}.
+
+  Ahora reemplacé el estado simulado de mi SessionContext por el real. Escucha onAuthStateChanged y, si hay usuario, hace onSnapshot de drivers/{uid}: si no existe el documento el estado es "unregistered", si status es "approved" es "approved" y cualquier otro valor es "pending". RootNavigator muestra una carga mientras isLoading es true, una pantalla de error con botón de salir si error tiene valor, y si no, la rama de navegación según el estado.
+
+  Este es el código:
+
+  ```js
+  // src/context/SessionContext.js
+  // Context de sesión: dice en qué situación está el conductor para que la
+  // navegación raíz (RootNavigator) decida qué pantallas mostrar.
+  // Escucha a Firebase en tiempo real:
+  //   1) onAuthStateChanged: ¿hay un usuario con sesión iniciada?
+  //   2) onSnapshot de drivers/{uid}: ¿ya envió su registro? ¿está aprobado?
+  // Si el estado cambia en la base de datos (por ejemplo, de "pending" a
+  // "approved" desde la consola), la app cambia de pantalla sola.
+  // AI-assisted: see docs/AI_LOG.md #6
+  import React, { createContext, useEffect, useMemo, useState } from 'react';
+  import { onAuthStateChanged } from 'firebase/auth';
+  import { doc, onSnapshot } from 'firebase/firestore';
+  import { auth, db } from '../config/firebase';
+
+  // Estados posibles del conductor, en el orden en que avanza.
+  export const DRIVER_STATUS = Object.freeze({
+    SIGNED_OUT: 'signedOut', // sin sesión
+    UNREGISTERED: 'unregistered', // tiene cuenta, pero no ha enviado el registro
+    PENDING: 'pending', // registro enviado, esperando aprobación
+    APPROVED: 'approved', // aprobado: puede usar la app
+  });
+
+  // Traduce el documento del conductor a un estado de la navegación.
+  // Solo "approved" da acceso al menú: cualquier otro valor se trata como
+  // pendiente (ante un dato raro se niega el acceso en vez de darlo).
+  function statusFromSnapshot(snapshot) {
+    if (!snapshot.exists()) {
+      return DRIVER_STATUS.UNREGISTERED;
+    }
+    return snapshot.data().status === 'approved' ? DRIVER_STATUS.APPROVED : DRIVER_STATUS.PENDING;
+  }
+
+  export const SessionContext = createContext(null);
+
+  export function SessionProvider({ children }) {
+    const [user, setUser] = useState(null);
+    const [driverStatus, setDriverStatus] = useState(DRIVER_STATUS.SIGNED_OUT);
+    // Empieza en true: al abrir la app, Firebase tarda un momento en decir si
+    // había una sesión guardada. Sin esto se vería el login por un instante.
+    const [isLoading, setIsLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    useEffect(() => {
+      // Escucha del documento del conductor; se cambia cada vez que cambia el usuario.
+      let unsubscribeDriver = null;
+      const stopDriverListener = () => {
+        if (unsubscribeDriver) {
+          unsubscribeDriver();
+          unsubscribeDriver = null;
+        }
+      };
+
+      const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+        // Cambió el usuario (inició o cerró sesión): se cierra la escucha anterior
+        // para no seguir leyendo el documento de otra persona.
+        stopDriverListener();
+        setUser(firebaseUser);
+        setError(null);
+
+        if (!firebaseUser) {
+          setDriverStatus(DRIVER_STATUS.SIGNED_OUT);
+          setIsLoading(false);
+          return;
+        }
+
+        setIsLoading(true);
+        unsubscribeDriver = onSnapshot(
+          doc(db, 'drivers', firebaseUser.uid),
+          (snapshot) => {
+            setDriverStatus(statusFromSnapshot(snapshot));
+            setError(null);
+            setIsLoading(false);
+          },
+          (snapshotError) => {
+            console.log('Error escuchando el documento del conductor:', snapshotError.code);
+            setError('No se pudo cargar tu información. Revisa tu conexión e intenta de nuevo.');
+            setIsLoading(false);
+          }
+        );
+      });
+
+      // Limpieza: al desmontar el Provider se cierran las dos escuchas.
+      return () => {
+        unsubscribeAuth();
+        stopDriverListener();
+      };
+    }, []);
+
+    // useMemo: el objeto solo se crea de nuevo cuando cambia algún dato, así las
+    // pantallas que usan el contexto no se vuelven a dibujar sin necesidad.
+    const value = useMemo(
+      () => ({ user, driverStatus, isLoading, error }),
+      [user, driverStatus, isLoading, error]
+    );
+
+    return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  }
+
+  // ----- src/navigation/RootNavigator.js -----
+  // src/navigation/RootNavigator.js
+  // Navegación raíz: según el estado del conductor (SessionContext) solo existe
+  // una de las ramas. Un conductor que no está "approved" nunca tiene el Drawer
+  // montado, así que no puede llegar a Inicio ni ponerse disponible (enunciado §2).
+  // AI-assisted: see docs/AI_LOG.md #3
+  import React from 'react';
+  import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
+  import { createNativeStackNavigator } from '@react-navigation/native-stack';
+  import useSession from '../hooks/useSession';
+  import { DRIVER_STATUS } from '../context/SessionContext';
+  import RegisterTabs from './RegisterTabs';
+  import MainDrawer from './MainDrawer';
+  import PlaceholderScreen from '../components/PlaceholderScreen';
+  import LoginScreen from '../screens/auth/LoginScreen';
+  import SignOutButton from '../components/SignOutButton';
+
+  const Stack = createNativeStackNavigator();
+
+  export default function RootNavigator() {
+    const { driverStatus, isLoading, error } = useSession();
+
+    // Mientras Firebase confirma la sesión y el estado del conductor, se muestra
+    // una carga: así no aparece el login por un instante a quien ya tenía sesión.
+    if (isLoading) {
+      return (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color="#111827" />
+        </View>
+      );
+    }
+
+    // Si no se pudo leer el estado (sin conexión, permisos), se explica y se
+    // deja cerrar sesión, en vez de mostrar una pantalla que no corresponde.
+    if (error) {
+      return (
+        <View style={styles.center}>
+          <Text style={styles.errorText}>{error}</Text>
+          <SignOutButton />
+        </View>
+      );
+    }
+
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {driverStatus === DRIVER_STATUS.SIGNED_OUT && (
+          <Stack.Screen name="Login" component={LoginScreen} />
+        )}
+        {driverStatus === DRIVER_STATUS.UNREGISTERED && (
+          <Stack.Screen name="Register" component={RegisterTabs} />
+        )}
+        {driverStatus === DRIVER_STATUS.PENDING && (
+          <Stack.Screen
+            name="Pending"
+            component={PlaceholderScreen}
+            options={{
+              headerShown: true,
+              title: 'Pendiente de aprobación',
+              headerRight: () => <SignOutButton />,
+            }}
+          />
+        )}
+        {driverStatus === DRIVER_STATUS.APPROVED && <Stack.Screen name="Main" component={MainDrawer} />}
+      </Stack.Navigator>
+    );
+  }
+
+  const styles = StyleSheet.create({
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 24,
+      backgroundColor: '#FFFFFF',
+    },
+    errorText: {
+      marginBottom: 16,
+      fontSize: 15,
+      textAlign: 'center',
+      color: '#DC2626',
+    },
+  });
+  ```
+
+  Mis dudas:
+  1. ¿Se cierran bien las escuchas? Cuando el usuario cierra sesión o cambia de usuario, ¿puede quedar viva la escucha del documento anterior o llegar un dato del usuario anterior?
+  2. Al cerrar sesión, ¿el onSnapshot puede disparar un error de permisos antes de que onAuthStateChanged avise? ¿Lo estoy manejando bien al limpiar el error?
+  3. ¿Es correcto poner isLoading en true otra vez cada vez que cambia el usuario? ¿Hay parpadeos o casos donde se quede cargando para siempre (por ejemplo, sin internet)?
+  4. ¿Tratar cualquier status distinto de "approved" como "pending" es una buena decisión de seguridad?
+
+  No me digas que está bien si no lo está. Busca errores, condiciones de carrera, fugas de memoria, casos que fallen en Android e iOS y lo que haría distinto un desarrollador senior. Si todo está correcto, dime qué casos probaría para comprobarlo. No me sugieras instalar librerías nuevas."
+- Resumen de la respuesta: Gemini consideró correcto el cierre de las escuchas (stopDriverListener al cambiar de usuario y en la limpieza del useEffect). Confirmó que al cerrar sesión el onSnapshot puede disparar un error `permission-denied` antes de que se cierre la escucha, lo que mostraría por un instante el mensaje de error rojo, y propuso ignorar el error si `auth.currentUser` ya es null. Sobre la carga sin internet, dijo que onSnapshot se quedaría esperando la red y la app quedaría en la pantalla de carga para siempre, y propuso usar `getDoc` con un tiempo de espera de 5 a 8 segundos. Calificó como correcta (fail-secure) la decisión de tratar cualquier status distinto de "approved" como "pending". Sugirió probar: arranque en modo avión, cambio de status en vivo desde la consola y cierre de sesión sin mensaje de error.
+- Qué se usó / modificó / descartó: Se usó la condición `if (!auth.currentUser) return;` en el callback de error del onSnapshot. Se mantuvo la decisión fail-secure. Se corrigió el diagnóstico de Gemini sobre la carga sin internet: el SDK de Firestore no se queda esperando, sino que responde desde su caché con `snapshot.metadata.fromCache` en true y, como el documento no está en la caché, `snapshot.exists()` da false; el problema real era que la app mandaba al conductor a las pestañas de registro como si no estuviera registrado. Se agregó la condición `if (!snapshot.exists() && snapshot.metadata.fromCache)`, que muestra "Sin conexión. Conéctate a internet para cargar tu información." en vez de cambiar de pantalla. Se descartaron `getDoc` con tiempo de espera (se pierde el cambio de estado en tiempo real) y la prueba en modo avión.
+- Archivos y commit: src/context/SessionContext.js, src/navigation/RootNavigator.js, src/components/SignOutButton.js, src/navigation/RegisterTabs.js, src/screens/auth/LoginScreen.js — b16aeeb
+- Verificación: En el iPhone con la cuenta prueba1: la sesión guardada abre directo en las pestañas de registro (captura 23), "Salir" vuelve al login (captura 24) e iniciar sesión vuelve a las pestañas (captura 25). Se creó el documento drivers/{uid} con status "pending" en la consola (captura 26) y al cambiar el status desde la consola la app pasó sola a "Pendiente de aprobación", al menú (approved) y de nuevo a pendiente (capturas 27 a 29). Las dos condiciones de la corrección se revisaron en el código del PC antes del commit.
+- Aprendizaje: Una escucha en tiempo real necesita manejar tres momentos: cuando llega el dato, cuando falla y cuando se cierra la sesión, porque el cierre de sesión también produce un error de permisos que no se le debe mostrar al usuario. Sin conexión, Firestore responde desde la caché, así que "el documento no existe" no siempre significa que el conductor no se ha registrado; `metadata.fromCache` permite distinguirlo. También comprobé que la IA puede acertar en un punto y equivocarse en otro de la misma respuesta.
