@@ -405,6 +405,31 @@ Ya monté el esqueleto de navegación que revisamos y lo probé en mi iPhone con
 - Prompt: "entonces vamos a paso paso con el firebase" — "este paso no lo entiendo" (sobre la instrucción de crear el archivo .env) — "y que nombre le pong al .env ?" — "[configuración web de Firebase pegada desde la consola; valores omitidos] dame el que debo poner entonces en el visaul" — "listo guardado" — "entonces de aqui que ?" — "confirmada la ubicaicon que dices" — "Listo acabo de crear la rama y abajo te epgo la salida del install firebase"
 - Resumen de la respuesta: Guía paso a paso para crear el proyecto `uberclone-conductor` en el plan Spark, registrar la app web, pasar los 6 valores del `firebaseConfig` a un archivo `.env` con variables `EXPO_PUBLIC_FIREBASE_*`, activar el acceso con correo y contraseña, crear Firestore en `southamerica-east1` en modo de producción e instalar el SDK con `npx expo install firebase`.
 - Qué se usó / modificó / descartó: Se usaron todos los pasos. Se modificó el `.env`: la primera vez se copiaron los valores de ejemplo en lugar de los reales y se corrigió con la configuración del proyecto. Se descartó el comando `npm install firebase` que muestra la consola (se usó `npx expo install`), Google Analytics, Gemini en Firebase, "Acceder con Google", la autenticación de varios factores, el plan Blaze y el modo de prueba de Firestore (se eligió modo de producción para que la base no quede abierta).
-- Archivos y commit: package.json, package-lock.json (firebase 13.2.0) — [completar con el hash del commit 1 de feature/firebase]. El archivo .env no se sube al repositorio (está en el .gitignore).
+- Archivos y commit: package.json, package-lock.json (firebase 13.2.0), src/config/firebase.js, .env.example — 85b63da. El archivo .env no se sube al repositorio (está en el .gitignore).(está en el .gitignore).
 - Verificación: Revisión del .env en el PC: las 6 variables con el nombre exacto y los valores del proyecto, sin valores de ejemplo. `git status` limpio, lo que confirma que el .env está ignorado. En la consola: Correo electrónico/contraseña "Habilitada" y reglas de Firestore `allow read, write: if false;`. En la instalación, Expo mostró `env: load .env` con las 6 variables cargadas.
 - Aprendizaje: La configuración web de Firebase no es secreta (la seguridad la dan las reglas de Firestore), pero igual se guarda en un .env para no dejarla fija en el código; Expo solo expone a la app las variables con prefijo `EXPO_PUBLIC_`. Elegir modo de producción en Firestore obliga a escribir reglas antes de usar la base, pero evita dejar los datos abiertos.
+
+### Entrada #5
+- Fecha: 2026-11-06
+- Integrante: Fray Sebastián Benítez Rodríguez
+- Herramienta: Gemini
+- Objetivo: Decidir dónde guardar la sesión de Firebase Authentication (AsyncStorage o SecureStore) para que el conductor no tenga que iniciar sesión cada vez que abre la app.
+- Prompt: "Sigo con mi UberClone versión conductor (Expo SDK 58, JavaScript, Expo Go en iPhone, Firebase JS SDK 13.2). Voy a agregar Firebase Authentication con correo y contraseña.
+
+  Tengo que decidir dónde se guarda la sesión del usuario para que no tenga que iniciar sesión cada vez que abre la app:
+
+  (a) La forma que documenta Expo: initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) }), con @react-native-async-storage/async-storage. El token de renovación de Firebase queda en AsyncStorage, que no está cifrado.
+
+  (b) expo-secure-store (cifrado), escribiendo un adaptador propio con getItem/setItem/removeItem para pasárselo a getReactNativePersistence. Las reglas de mi curso dicen que los tokens van en SecureStore. Pero SecureStore no acepta ":" en las claves (Firebase usa claves como "firebase:authUser:...") y avisa con valores de más de 2048 bytes.
+
+  Mis dudas:
+  1. ¿Cuál es más correcta para un proyecto académico que se evalúa en seguridad? ¿El riesgo de (a) es real en un celular?
+  2. Si elijo (b), ¿qué puede fallar con el adaptador (claves, tamaño, Android vs iOS)?
+  3. ¿Hay una opción (c) mejor que no esté viendo?
+
+  No me digas que está bien si no lo está. Busca errores, casos que fallen (Android e iOS) y lo que haría distinto un desarrollador senior. No me sugieras librerías fuera de Expo."
+- Resumen de la respuesta: Gemini consideró (b) la más correcta frente a la regla del curso y confirmó que el riesgo de (a) es real en dispositivos con root, jailbreak o respaldos sin cifrar. Advirtió que (b) choca con las claves con ":" y el límite de 2048 bytes de SecureStore, y propuso como alternativa mantener la sesión en memoria o usar (a) con una justificación documentada.
+- Qué se usó / modificó / descartó: Se usó la opción (a) con la justificación documentada en el código. Se corrigieron afirmaciones de Gemini: el almacenamiento de AsyncStorage es SQLite en Android y archivos en iOS (no al revés), y el límite de 2048 bytes hoy solo genera una advertencia. Se descartaron `react-native-mmkv` y `NSFileProtectionComplete` (no funcionan en Expo Go) y la sesión en memoria (obliga a iniciar sesión cada vez). Gemini no consideró que (b) se puede resolver dividiendo el valor en pedazos; queda como mejora si se necesita.
+- Archivos y commit: src/config/firebase.js (inicialización de auth con persistencia), src/services/authService.js, src/screens/auth/LoginScreen.js, src/utils/validators.js — b66047a
+- Verificación: En el iPhone se creó una cuenta, se inició sesión, se probó un correo repetido y una contraseña equivocada (capturas 12 a 16); las cuentas aparecen en la consola de Firebase, Authentication → Usuarios (captura 17). `npm test`: 7 passed.
+- Aprendizaje: Guardar la sesión implica decidir entre seguridad y estabilidad: SecureStore cifra, pero Firebase guarda valores que superan su límite. El enunciado permite la sesión en AsyncStorage y la regla del curso pide SecureStore; documentar esa diferencia es parte de la decisión. También aprendí a contrastar la respuesta de la IA: Gemini se contradijo y sugirió librerías que no funcionan en Expo Go.

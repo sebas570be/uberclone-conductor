@@ -1,8 +1,8 @@
 // src/screens/auth/LoginScreen.js
 // Formulario de inicio de sesión y creación de cuenta (correo y contraseña).
 // Regla del enunciado: los errores van DEBAJO de cada campo, nunca en Alert.
-// Por ahora, al tener éxito muestra un mensaje: la navegación cambiará sola
-// cuando el SessionContext escuche a Firebase (siguiente commit).
+// Al iniciar sesión o crear la cuenta no hace falta navegar: el SessionContext
+// detecta el usuario y RootNavigator cambia de pantalla solo.
 import React, { useState } from 'react';
 import {
   View,
@@ -26,7 +26,6 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [errors, setErrors] = useState({}); // { email, password }: error de cada campo
   const [formError, setFormError] = useState(null); // error que devuelve Firebase
-  const [successMessage, setSuccessMessage] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
   // Valida antes de llamar a Firebase: así el usuario ve el error al instante
@@ -45,15 +44,15 @@ export default function LoginScreen() {
 
   const handleSubmit = async () => {
     setFormError(null);
-    setSuccessMessage(null);
     if (!validate()) return;
 
     setIsLoading(true);
     try {
-      const user = isSignUp ? await signUp(email, password) : await signIn(email, password);
-      setSuccessMessage(
-        isSignUp ? `Cuenta creada: ${user.email}` : `Sesión iniciada: ${user.email}`
-      );
+      if (isSignUp) {
+        await signUp(email, password);
+      } else {
+        await signIn(email, password);
+      }
     } catch (error) {
       setFormError(getAuthErrorMessage(error));
     } finally {
@@ -66,7 +65,6 @@ export default function LoginScreen() {
     setIsSignUp((current) => !current);
     setErrors({});
     setFormError(null);
-    setSuccessMessage(null);
   };
 
   return (
@@ -118,7 +116,6 @@ export default function LoginScreen() {
         </Pressable>
 
         {formError && <Text style={styles.errorText}>{formError}</Text>}
-        {successMessage && <Text style={styles.successText}>{successMessage}</Text>}
 
         <Pressable onPress={toggleMode} disabled={isLoading} accessibilityRole="button">
           <Text style={styles.link}>
@@ -173,11 +170,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
     fontSize: 13,
     color: '#DC2626',
-  },
-  successText: {
-    marginTop: 12,
-    fontSize: 14,
-    color: '#15803D',
   },
   button: {
     marginTop: 24,

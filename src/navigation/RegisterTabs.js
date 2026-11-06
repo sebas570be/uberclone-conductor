@@ -4,12 +4,14 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import PlaceholderScreen from '../components/PlaceholderScreen';
+import SignOutButton from '../components/SignOutButton';
 
 const Tab = createBottomTabNavigator();
 
 export default function RegisterTabs() {
   return (
-    <Tab.Navigator>
+    // "Salir" en el encabezado: en el registro todavía no hay menú para cerrar sesión.
+    <Tab.Navigator screenOptions={{ headerRight: () => <SignOutButton /> }}>
       <Tab.Screen name="PersonalData" component={PlaceholderScreen} options={{ title: 'Datos personales' }} />
       <Tab.Screen name="Vehicle" component={PlaceholderScreen} options={{ title: 'Vehículo' }} />
       <Tab.Screen name="Documents" component={PlaceholderScreen} options={{ title: 'Documentos' }} />
