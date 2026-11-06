@@ -69,3 +69,330 @@ Regla: nunca se pegan en un prompt llaves de API, access_token ni datos personal
 - Archivos y commit: Ninguno (análisis previo, sin cambios en el repositorio)
 - Verificación: Cada sección se contrastó con el enunciado (§1–§9), la concertación de evaluación del grupo 003, el microcurrículo y el instructivo de la bitácora.
 - Aprendizaje: Analizar el enunciado completo antes de programar permite ver cómo se conectan los módulos (registro, solicitudes, viaje, pago e historial), identificar las partes más difíciles y detectar a tiempo requisitos que no funcionan en Expo Go o que dependen de APIs que Google ya no habilita.
+
+### Entrada #3
+- Fecha: 2026-11-05
+- Integrante: Fray Sebastián Benítez Rodríguez
+- Herramienta: Gemini
+- Objetivo: Definir y revisar cómo se anidan los navegadores (Stack, Tabs y Drawer) según el estado del conductor, cómo probarlos antes de tener Firebase, y revisar el código del esqueleto ya probado.
+- Prompt 1: "Sigo con mi proyecto UberClone versión conductor (Expo SDK 58, JavaScript, Expo Go en iPhone, React Navigation 7 ya instalado: native-stack, bottom-tabs y drawer).
+
+  El enunciado pide navegación combinada: Stack para el flujo del viaje, Tabs para el registro (3 pestañas: Datos personales, Vehículo, Documentos) y Drawer para perfil, historial, ganancias y configuración. No dice cómo se anidan. Además, el conductor solo puede usar la app cuando su registro está "approved"; antes está "pending".
+
+  Esta es la estructura que me suena no se si este correcta:
+
+  RootNavigator (decide según la sesión y el estado del conductor)
+  sin sesión -> AuthStack (Login)
+  sin registro -> RegisterTabs (3 pestañas)
+  pending -> PendingScreen
+  approved -> MainDrawer: Inicio (con un TripStack: Inicio -> Solicitud -> Viaje en curso -> Cobro), Historial, Ganancias, Perfil
+
+  Mis dudas:
+  ¿Esta anidación es correcta o conviene otra? ¿El TripStack debe ir dentro del Drawer o por encima de él?
+  2. ¿Hago ahora el esqueleto completo con pantallas simples (solo el nombre) o agrego cada navegador cuando construya su pantalla?
+  3. Firebase todavía no está. Pienso usar un SessionContext con el estado simulado ('approved', 'pending', etc.) que cambio a mano para probar, y después lo conecto a Firebase. ¿Es buena idea o hay una forma mejor?
+
+  Hazme un par review de la propuesta."
+- Prompt 2: "si, planteame el codigo yo lo veo y reviso que usar y que no segun mi concepto"
+- Prompt 3: "
+Ya monté el esqueleto de navegación que revisamos y lo probé en mi iPhone con Expo Go: los 4 estados funcionan (approved, pending, unregistered, signedOut) y en la pantalla "Solicitud" el menú del Drawer no se abre. Uso Expo SDK 58, JavaScript, React Navigation 7 (native-stack 7.21, bottom-tabs 7.21, drawer 7.14), react-native-gesture-handler 3.3 y react-native-reanimated 4.7.
+  
+  Te paso el código de los 8 archivos para que me hagas un par review de si es viable y correcto.
+  
+  ```js
+  ===== App.js =====
+  // App.js
+  // Jerarquía (de afuera hacia adentro):
+  // GestureHandlerRootView → SafeAreaProvider → SessionProvider → NavigationContainer → RootNavigator.
+  // - GestureHandlerRootView: necesario para los gestos (deslizar el Drawer).
+  // - SessionProvider va por encima de la navegación para que RootNavigator y
+  //   cualquier pantalla puedan leer el estado del conductor.
+  // AI-assisted: see docs/AI_LOG.md #3
+  import React from 'react';
+  import { StyleSheet } from 'react-native';
+  import { StatusBar } from 'expo-status-bar';
+  import { GestureHandlerRootView } from 'react-native-gesture-handler';
+  import { SafeAreaProvider } from 'react-native-safe-area-context';
+  import { NavigationContainer } from '@react-navigation/native';
+  import { SessionProvider } from './src/context/SessionContext';
+  import RootNavigator from './src/navigation/RootNavigator';
+  
+  export default function App() {
+    return (
+      <GestureHandlerRootView style={styles.root}>
+        <SafeAreaProvider>
+          <SessionProvider>
+            <NavigationContainer>
+              <StatusBar style="dark" />
+              <RootNavigator />
+            </NavigationContainer>
+          </SessionProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    );
+  }
+  
+  const styles = StyleSheet.create({
+    root: {
+      flex: 1,
+    },
+  });
+  
+  ===== src/context/SessionContext.js =====
+  // src/context/SessionContext.js
+  // Context de sesión: guarda en qué situación está el conductor para que la
+  // navegación raíz (RootNavigator) decida qué pantallas mostrar.
+  // Por ahora el estado es SIMULADO: se cambia a mano INITIAL_STATUS para probar
+  // cada caso. Cuando llegue Firebase, este archivo leerá el estado real
+  // (sesión + documento del conductor) y los navegadores no cambian.
+  // AI-assisted: see docs/AI_LOG.md #3
+  import React, { createContext, useMemo, useState } from 'react';
+  
+  // Estados posibles del conductor, en el orden en que avanza.
+  export const DRIVER_STATUS = Object.freeze({
+    SIGNED_OUT: 'signedOut', // sin sesión
+    UNREGISTERED: 'unregistered', // tiene cuenta, pero no ha enviado el registro
+    PENDING: 'pending', // registro enviado, esperando aprobación
+    APPROVED: 'approved', // aprobado: puede usar la app
+  });
+  
+  // Valor para probar: cámbialo, guarda y la app muestra otra rama del árbol.
+  const INITIAL_STATUS = DRIVER_STATUS.APPROVED;
+  
+  export const SessionContext = createContext(null);
+  
+  export function SessionProvider({ children }) {
+    const [driverStatus, setDriverStatus] = useState(INITIAL_STATUS);
+  
+    // useMemo: el objeto solo se crea de nuevo cuando cambia el estado, así las
+    // pantallas que usan el contexto no se vuelven a dibujar sin necesidad.
+    const value = useMemo(() => ({ driverStatus, setDriverStatus }), [driverStatus]);
+  
+    return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  }
+  
+  ===== src/hooks/useSession.js =====
+  // src/hooks/useSession.js
+  // Hook para leer el SessionContext. Si se usa fuera del SessionProvider avisa
+  // con un error claro, en vez de fallar después con datos vacíos.
+  // AI-assisted: see docs/AI_LOG.md #3
+  import { useContext } from 'react';
+  import { SessionContext } from '../context/SessionContext';
+  
+  export default function useSession() {
+    const context = useContext(SessionContext);
+    if (!context) {
+      throw new Error('useSession debe usarse dentro de un <SessionProvider>.');
+    }
+    return context;
+  }
+  
+  ===== src/components/PlaceholderScreen.js =====
+  // src/components/PlaceholderScreen.js
+  // Pantalla provisional del esqueleto de navegación: muestra el nombre de la
+  // ruta y, si la ruta trae el parámetro "next", un botón para ir a la siguiente.
+  // Cada una se reemplaza por la pantalla real cuando se construya su módulo.
+  // AI-assisted: see docs/AI_LOG.md #3
+  import React from 'react';
+  import { View, Text, Pressable, StyleSheet } from 'react-native';
+  
+  export default function PlaceholderScreen({ route, navigation }) {
+    const next = route.params?.next;
+  
+    return (
+      <View style={styles.container}>
+        <Text style={styles.title}>{route.name}</Text>
+        <Text style={styles.subtitle}>Pantalla en construcción</Text>
+        {next && (
+          <Pressable
+            style={styles.button}
+            onPress={() => navigation.navigate(next)}
+            accessibilityRole="button"
+          >
+            <Text style={styles.buttonText}>Ir a {next}</Text>
+          </Pressable>
+        )}
+      </View>
+    );
+  }
+  
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+      backgroundColor: '#FFFFFF',
+    },
+    title: {
+      fontSize: 22,
+      fontWeight: '700',
+      color: '#111827',
+    },
+    subtitle: {
+      marginTop: 4,
+      fontSize: 14,
+      color: '#6B7280',
+    },
+    button: {
+      marginTop: 24,
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 8,
+      backgroundColor: '#111827',
+    },
+    buttonText: {
+      color: '#FFFFFF',
+      fontWeight: '600',
+    },
+  });
+  
+  ===== src/navigation/RegisterTabs.js =====
+  // src/navigation/RegisterTabs.js
+  // Tabs del registro (enunciado §2): las 3 pestañas del formulario del conductor.
+  // AI-assisted: see docs/AI_LOG.md #3
+  import React from 'react';
+  import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+  import PlaceholderScreen from '../components/PlaceholderScreen';
+  
+  const Tab = createBottomTabNavigator();
+  
+  export default function RegisterTabs() {
+    return (
+      <Tab.Navigator>
+        <Tab.Screen name="PersonalData" component={PlaceholderScreen} options={{ title: 'Datos personales' }} />
+        <Tab.Screen name="Vehicle" component={PlaceholderScreen} options={{ title: 'Vehículo' }} />
+        <Tab.Screen name="Documents" component={PlaceholderScreen} options={{ title: 'Documentos' }} />
+      </Tab.Navigator>
+    );
+  }
+  
+  ===== src/navigation/TripStack.js =====
+  // src/navigation/TripStack.js
+  // Stack del viaje (enunciado §3): Inicio → Solicitud → Viaje en curso → Cobro.
+  // Cada pantalla provisional recibe en "next" la siguiente, para probar el flujo.
+  // AI-assisted: see docs/AI_LOG.md #3
+  import React from 'react';
+  import { createNativeStackNavigator } from '@react-navigation/native-stack';
+  import PlaceholderScreen from '../components/PlaceholderScreen';
+  
+  const Stack = createNativeStackNavigator();
+  
+  export default function TripStack() {
+    return (
+      <Stack.Navigator>
+        {/* Home sin encabezado propio: usa el del Drawer (con el botón de menú) */}
+        <Stack.Screen
+          name="Home"
+          component={PlaceholderScreen}
+          options={{ headerShown: false }}
+          initialParams={{ next: 'TripRequest' }}
+        />
+        <Stack.Screen
+          name="TripRequest"
+          component={PlaceholderScreen}
+          options={{ title: 'Solicitud' }}
+          initialParams={{ next: 'TripInProgress' }}
+        />
+        <Stack.Screen
+          name="TripInProgress"
+          component={PlaceholderScreen}
+          options={{ title: 'Viaje en curso' }}
+          initialParams={{ next: 'TripSummary' }}
+        />
+        <Stack.Screen name="TripSummary" component={PlaceholderScreen} options={{ title: 'Cobro y resumen' }} />
+      </Stack.Navigator>
+    );
+  }
+  
+  ===== src/navigation/MainDrawer.js =====
+  // src/navigation/MainDrawer.js
+  // Drawer del conductor aprobado (enunciado F8): Inicio (con el TripStack),
+  // Historial, Ganancias y Perfil.
+  // AI-assisted: see docs/AI_LOG.md #3
+  import React from 'react';
+  import { createDrawerNavigator } from '@react-navigation/drawer';
+  import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
+  import TripStack from './TripStack';
+  import PlaceholderScreen from '../components/PlaceholderScreen';
+  
+  const Drawer = createDrawerNavigator();
+  
+  // Estar dentro del Drawer NO oculta el menú por sí solo: hay que bloquearlo.
+  // Mientras el conductor está en una pantalla del viaje (cualquiera distinta de
+  // Home) se quita el encabezado del Drawer y el gesto para abrir el menú.
+  function startOptions({ route }) {
+    const focusedScreen = getFocusedRouteNameFromRoute(route) ?? 'Home';
+    const isHome = focusedScreen === 'Home';
+    return { title: 'Inicio', headerShown: isHome, swipeEnabled: isHome };
+  }
+  
+  export default function MainDrawer() {
+    return (
+      <Drawer.Navigator>
+        <Drawer.Screen name="Start" component={TripStack} options={startOptions} />
+        <Drawer.Screen name="History" component={PlaceholderScreen} options={{ title: 'Historial' }} />
+        <Drawer.Screen name="Earnings" component={PlaceholderScreen} options={{ title: 'Ganancias' }} />
+        <Drawer.Screen name="Profile" component={PlaceholderScreen} options={{ title: 'Perfil y configuración' }} />
+      </Drawer.Navigator>
+    );
+  }
+  
+  ===== src/navigation/RootNavigator.js =====
+  // src/navigation/RootNavigator.js
+  // Navegación raíz: según el estado del conductor (SessionContext) solo existe
+  // una de las ramas. Un conductor que no está "approved" nunca tiene el Drawer
+  // montado, así que no puede llegar a Inicio ni ponerse disponible (enunciado §2).
+  // AI-assisted: see docs/AI_LOG.md #3
+  import React from 'react';
+  import { createNativeStackNavigator } from '@react-navigation/native-stack';
+  import useSession from '../hooks/useSession';
+  import { DRIVER_STATUS } from '../context/SessionContext';
+  import RegisterTabs from './RegisterTabs';
+  import MainDrawer from './MainDrawer';
+  import PlaceholderScreen from '../components/PlaceholderScreen';
+  
+  const Stack = createNativeStackNavigator();
+  
+  export default function RootNavigator() {
+    const { driverStatus } = useSession();
+  
+    return (
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {driverStatus === DRIVER_STATUS.SIGNED_OUT && (
+          <Stack.Screen
+            name="Login"
+            component={PlaceholderScreen}
+            options={{ headerShown: true, title: 'Iniciar sesión' }}
+          />
+        )}
+        {driverStatus === DRIVER_STATUS.UNREGISTERED && (
+          <Stack.Screen name="Register" component={RegisterTabs} />
+        )}
+        {driverStatus === DRIVER_STATUS.PENDING && (
+          <Stack.Screen
+            name="Pending"
+            component={PlaceholderScreen}
+            options={{ headerShown: true, title: 'Pendiente de aprobación' }}
+          />
+        )}
+        {driverStatus === DRIVER_STATUS.APPROVED && <Stack.Screen name="Main" component={MainDrawer} />}
+      </Stack.Navigator>
+    );
+  }
+  ```
+  
+  Mis dudas:
+  1. ¿Es correcto renderizar las pantallas del RootNavigator de forma condicional según driverStatus, o es mejor navegar con navigation.navigate/reset cuando cambia el estado?
+  2. Para bloquear el menú durante el viaje uso getFocusedRouteNameFromRoute en las options del Drawer (headerShown y swipeEnabled solo en Home). ¿Es la forma recomendada en React Navigation 7 o hay una mejor?
+  3. En la pantalla "Solicitud", al deslizar a la derecha se regresa a Inicio (gesto de volver del Stack en iOS). En el viaje real eso no debería pasar. ¿Lo quito con gestureEnabled: false y headerBackVisible: false en las pantallas del viaje, o hay otra forma?
+  4. ¿Está bien el orden de los providers en App.js (GestureHandlerRootView, SafeAreaProvider, SessionProvider, NavigationContainer)?
+  5. ¿Ves algo que vaya a dar problemas cuando conecte Firebase al SessionContext?
+  
+  No me sugieras instalar librerías nuevas.
+  "
+- Resumen de la respuesta: En la primera revisión Gemini aprobó la estructura (TripStack dentro del Drawer), recomendó el esqueleto completo y el SessionContext con estado simulado, y sugirió un botón flotante para cambiar de estado; a la segunda pregunta respondió sobre una "pantalla de perfil" ajena al proyecto. En la revisión del código confirmó el renderizado condicional en la raíz y `getFocusedRouteNameFromRoute`, recomendó `gestureEnabled: false` y `headerBackVisible: false` en las pantallas del viaje, y advirtió que al conectar Firebase hace falta un estado de carga y limpiar los listeners.
+- Qué se usó / modificó / descartó: Se usó la estructura del árbol, el esqueleto completo y el SessionContext con estado simulado, cambiado a mano. Se modificó la afirmación de que el Drawer queda oculto durante el viaje: no ocurre solo, así que se bloqueó con `swipeEnabled` y `headerShown` según la pantalla activa. En vez de 12 archivos de pantalla vacíos se usó un solo `PlaceholderScreen`. Se descartó el botón flotante y la respuesta sobre la "pantalla de perfil". Quedan pendientes: bloquear el regreso en las pantallas del viaje en la rama del viaje (Gemini no mencionó que `gestureEnabled` no bloquea el botón atrás de Android; para eso se usará `usePreventRemove`) y el estado de carga con `unsubscribe` al conectar Firebase.
+- Archivos y commit: src/context/SessionContext.js, src/hooks/useSession.js — bcf342e · src/components/PlaceholderScreen.js, src/navigation/RegisterTabs.js, src/navigation/TripStack.js, src/navigation/MainDrawer.js — a639984 · src/navigation/RootNavigator.js, App.js, docs/capturas/04 a 11 — d3f28cf
+- Verificación: Prueba en iPhone con Expo Go de los 4 estados (approved, pending, unregistered, signedOut) cambiando INITIAL_STATUS: cada estado muestra solo su rama y en "Solicitud" el menú no se puede abrir (capturas 04 a 11). `npm test`: 4 passed. Revisión del código con Gemini.
+- Aprendizaje: El enunciado dice qué navegador usar, pero no cómo anidarlos; decidir la raíz por el estado del conductor hace que un conductor no aprobado ni siquiera tenga montado el menú. Aprendí a no aceptar todo lo que dice la IA: el Drawer no se bloquea solo, una respuesta de Gemini era de otra conversación y su revisión no consideró el botón atrás de Android. De aquí en adelante le pido revisiones críticas, no aprobación.
