@@ -7,7 +7,6 @@
 // AI-assisted: see docs/AI_LOG.md #3
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import PlaceholderScreen from '../components/PlaceholderScreen';
 import SignOutButton from '../components/SignOutButton';
 import { RegistrationProvider } from '../context/RegistrationContext';
 import useRegistration from '../hooks/useRegistration';
@@ -15,6 +14,7 @@ import { hasErrors } from '../utils/registrationErrors';
 import { PERSONAL_DATA_FIELDS, VEHICLE_FIELDS } from '../constants/registrationFields';
 import PersonalDataScreen from '../screens/register/PersonalDataScreen';
 import VehicleScreen from '../screens/register/VehicleScreen';
+import DocumentsScreen from '../screens/register/DocumentsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -68,7 +68,7 @@ function RegisterTabNavigator() {
       />
       <Tab.Screen
         name="Documents"
-        component={PlaceholderScreen}
+        component={DocumentsScreen}
         options={lockedOptions('Documentos', !(isPersonalDataComplete && isVehicleComplete), 'Datos personales y Vehículo')}
         listeners={blockUntilComplete(isPersonalDataComplete && isVehicleComplete)}
       />

@@ -40,6 +40,7 @@ export default function VehicleScreen({ navigation }) {
       style={formStyles.screen}
       contentContainerStyle={formStyles.container}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag" // al deslizar la pantalla se oculta el teclado
       automaticallyAdjustKeyboardInsets
     >
       <Text style={formStyles.step}>Paso 2 de 3</Text>

@@ -22,6 +22,9 @@ import {
   isValidBrandOrModel,
   isValidVehicleYear,
   isValidCapacity,
+  isValidEmail,
+  isFutureDate,
+  requiresTechnicalReview,
 } from './validators';
 
 export function getPersonalDataErrors(form, today = new Date()) {
@@ -81,6 +84,44 @@ export function getVehicleErrors(form, today = new Date()) {
       minimum === undefined
         ? 'Elige primero la categoría para saber la capacidad mínima.'
         : `Escribe la capacidad: mínimo ${minimum} pasajeros para ${labelFor(CATEGORY_OPTIONS, form.category)}.`;
+  }
+
+  return errors;
+}
+
+// Fecha de vencimiento obligatoria y posterior a hoy (enunciado: vencimiento > hoy).
+function expiryError(date, today, name) {
+  if (!date) return `Elige la fecha de vencimiento ${name}.`;
+  if (!isFutureDate(date, today)) return 'Está vencido: la fecha de vencimiento debe ser posterior a hoy.';
+  return undefined;
+}
+
+export function getDocumentsErrors(form, today = new Date()) {
+  const errors = {};
+
+  // En Colombia el número de la licencia de conducción es el de la cédula:
+  // misma regla que el documento (6 a 10 números). Ver README.
+  if (!isValidDocumentNumber(form.licenseNumber)) {
+    errors.licenseNumber = 'El número de licencia debe tener entre 6 y 10 números.';
+  }
+  const licenseError = expiryError(form.licenseExpiry, today, 'de la licencia');
+  if (licenseError) errors.licenseExpiry = licenseError;
+
+  const soatError = expiryError(form.soatExpiry, today, 'del SOAT');
+  if (soatError) errors.soatExpiry = soatError;
+
+  // La revisión técnico-mecánica solo se exige si el vehículo tiene 5 años o
+  // más (regla en src/config/registration.js). Si no aplica, no hay error.
+  if (requiresTechnicalReview(form.year, today)) {
+    const reviewError = expiryError(form.technicalReviewExpiry, today, 'de la revisión técnico-mecánica');
+    if (reviewError) errors.technicalReviewExpiry = reviewError;
+  }
+
+  if (!isValidEmail(form.mercadoPagoEmail)) {
+    errors.mercadoPagoEmail = 'Escribe el correo de tu cuenta de Mercado Pago (ejemplo: nombre@gmail.com).';
+  }
+  if (form.termsAccepted !== true) {
+    errors.termsAccepted = 'Debes aceptar los términos para enviar el registro.';
   }
 
   return errors;

@@ -12,3 +12,12 @@ export const PERSONAL_DATA_FIELDS = Object.freeze([
 ]);
 
 export const VEHICLE_FIELDS = Object.freeze(['category', 'plate', 'brand', 'model', 'year', 'color', 'capacity']);
+
+export const DOCUMENTS_FIELDS = Object.freeze([
+  'licenseNumber',
+  'licenseExpiry',
+  'soatExpiry',
+  'technicalReviewExpiry',
+  'mercadoPagoEmail',
+  'termsAccepted',
+]);

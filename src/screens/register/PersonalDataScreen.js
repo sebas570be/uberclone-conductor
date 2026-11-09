@@ -39,6 +39,7 @@ export default function PersonalDataScreen({ navigation }) {
       style={formStyles.screen}
       contentContainerStyle={formStyles.container}
       keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag" // al deslizar la pantalla se oculta el teclado
       automaticallyAdjustKeyboardInsets // iOS: deja ver el campo cuando sale el teclado
     >
       <Text style={formStyles.step}>Paso 1 de 3</Text>

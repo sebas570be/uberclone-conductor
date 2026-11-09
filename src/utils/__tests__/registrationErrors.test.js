@@ -1,5 +1,5 @@
 // src/utils/__tests__/registrationErrors.test.js
-import { getPersonalDataErrors, getVehicleErrors, hasErrors } from '../registrationErrors';
+import { getPersonalDataErrors, getVehicleErrors, getDocumentsErrors, hasErrors } from '../registrationErrors';
 
 const TODAY = new Date(2026, 10, 6); // 6 de noviembre de 2026
 
@@ -68,5 +68,36 @@ describe('getVehicleErrors', () => {
   test('sin categoría: la capacidad pide elegir primero la categoría', () => {
     const errors = getVehicleErrors({ ...VALID_VEHICLE, category: '' }, TODAY);
     expect(errors.capacity).toBe('Elige primero la categoría para saber la capacidad mínima.');
+  });
+});
+
+const VALID_DOCUMENTS = {
+  year: '2024', // vehículo de 2 años: la revisión técnico-mecánica no aplica
+  licenseNumber: '1234567890',
+  licenseExpiry: new Date(2030, 0, 1),
+  soatExpiry: new Date(2027, 5, 1),
+  technicalReviewExpiry: null,
+  mercadoPagoEmail: 'conductor@gmail.com',
+  termsAccepted: true,
+};
+
+describe('getDocumentsErrors', () => {
+  test('datos válidos y vehículo nuevo: no hay errores (la revisión no aplica)', () => {
+    expect(getDocumentsErrors(VALID_DOCUMENTS, TODAY)).toEqual({});
+  });
+
+  test('SOAT que vence hoy: se considera vencido', () => {
+    const errors = getDocumentsErrors({ ...VALID_DOCUMENTS, soatExpiry: new Date(2026, 10, 6) }, TODAY);
+    expect(errors.soatExpiry).toBe('Está vencido: la fecha de vencimiento debe ser posterior a hoy.');
+  });
+
+  test('vehículo de 5 años o más: la revisión técnico-mecánica es obligatoria', () => {
+    const errors = getDocumentsErrors({ ...VALID_DOCUMENTS, year: '2021' }, TODAY);
+    expect(errors.technicalReviewExpiry).toBe('Elige la fecha de vencimiento de la revisión técnico-mecánica.');
+  });
+
+  test('sin aceptar términos: no se puede enviar', () => {
+    const errors = getDocumentsErrors({ ...VALID_DOCUMENTS, termsAccepted: false }, TODAY);
+    expect(errors.termsAccepted).toBeDefined();
   });
 });
