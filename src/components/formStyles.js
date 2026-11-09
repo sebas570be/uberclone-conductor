@@ -4,6 +4,47 @@
 import { StyleSheet } from 'react-native';
 
 export const formStyles = StyleSheet.create({
+  // Pantalla de formulario (pestañas del registro)
+  screen: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  container: {
+    padding: 24,
+    paddingBottom: 40,
+  },
+  step: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#6B7280',
+  },
+  primaryButton: {
+    marginTop: 28,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    backgroundColor: '#111827',
+  },
+  primaryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  // Botón para volver a la pestaña anterior (borde, sin relleno).
+  secondaryButton: {
+    marginTop: 12,
+    paddingVertical: 14,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#111827',
+    alignItems: 'center',
+  },
+  secondaryButtonText: {
+    color: '#111827',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  // Campos
   field: {
     marginTop: 12,
   },

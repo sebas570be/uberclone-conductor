@@ -5,18 +5,18 @@
 // cuando el conductor sale del campo (onBlur) o toca "Siguiente".
 // La foto de perfil se agrega en el commit de fotos (expo-image-picker).
 import React from 'react';
-import { ScrollView, Text, Pressable, StyleSheet } from 'react-native';
+import { ScrollView, Text, Pressable } from 'react-native';
 import TextField from '../../components/TextField';
 import SelectField from '../../components/SelectField';
 import DateField from '../../components/DateField';
+import { formStyles } from '../../components/formStyles';
 import useRegistration from '../../hooks/useRegistration';
 import useSession from '../../hooks/useSession';
 import { GENDER_OPTIONS, LANGUAGE_OPTIONS } from '../../constants/registrationOptions';
 import { REGISTRATION_RULES } from '../../config/registration';
 import { hasErrors } from '../../utils/registrationErrors';
 import { yearsAgo } from '../../utils/dates';
-
-const PERSONAL_DATA_FIELDS = ['fullName', 'documentNumber', 'phone', 'birthDate', 'gender', 'language'];
+import { PERSONAL_DATA_FIELDS } from '../../constants/registrationFields';
 
 export default function PersonalDataScreen({ navigation }) {
   const { user } = useSession();
@@ -36,12 +36,12 @@ export default function PersonalDataScreen({ navigation }) {
 
   return (
     <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.container}
+      style={formStyles.screen}
+      contentContainerStyle={formStyles.container}
       keyboardShouldPersistTaps="handled"
       automaticallyAdjustKeyboardInsets // iOS: deja ver el campo cuando sale el teclado
     >
-      <Text style={styles.step}>Paso 1 de 3</Text>
+      <Text style={formStyles.step}>Paso 1 de 3</Text>
 
       <TextField
         label="Nombre completo"
@@ -75,7 +75,7 @@ export default function PersonalDataScreen({ navigation }) {
         keyboardType="number-pad"
         maxLength={10}
         autoComplete="tel"
-        placeholder="3001234567"
+        placeholder="Ej.: 3001234567"
       />
 
       <DateField
@@ -122,37 +122,10 @@ export default function PersonalDataScreen({ navigation }) {
         error={errorFor('language')}
       />
 
-      <Pressable style={styles.button} onPress={handleNext} accessibilityRole="button">
-        <Text style={styles.buttonText}>Siguiente: Vehículo</Text>
+      <Pressable style={formStyles.primaryButton} onPress={handleNext} accessibilityRole="button">
+        <Text style={formStyles.primaryButtonText}>Siguiente: Vehículo</Text>
       </Pressable>
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
-  },
-  container: {
-    padding: 24,
-    paddingBottom: 40,
-  },
-  step: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#6B7280',
-  },
-  button: {
-    marginTop: 28,
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    backgroundColor: '#111827',
-  },
-  buttonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-});

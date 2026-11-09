@@ -5,8 +5,24 @@
 // registro" para saber si todo está completo. Se prueba con Jest.
 // Devuelve un objeto { campo: mensaje } solo con los campos que tienen error.
 import { REGISTRATION_RULES } from '../config/registration';
-import { GENDER_OPTIONS, LANGUAGE_OPTIONS, isOptionValue } from '../constants/registrationOptions';
-import { isValidFullName, isValidDocumentNumber, isValidPhone, isAdult } from './validators';
+import {
+  GENDER_OPTIONS,
+  LANGUAGE_OPTIONS,
+  CATEGORY_OPTIONS,
+  COLOR_OPTIONS,
+  isOptionValue,
+  labelFor,
+} from '../constants/registrationOptions';
+import {
+  isValidFullName,
+  isValidDocumentNumber,
+  isValidPhone,
+  isAdult,
+  isValidPlate,
+  isValidBrandOrModel,
+  isValidVehicleYear,
+  isValidCapacity,
+} from './validators';
 
 export function getPersonalDataErrors(form, today = new Date()) {
   const errors = {};
@@ -30,6 +46,41 @@ export function getPersonalDataErrors(form, today = new Date()) {
   }
   if (!isOptionValue(LANGUAGE_OPTIONS, form.language)) {
     errors.language = 'Elige un idioma.';
+  }
+
+  return errors;
+}
+
+export function getVehicleErrors(form, today = new Date()) {
+  const errors = {};
+  const maxLength = REGISTRATION_RULES.maxBrandModelLength;
+
+  if (!isOptionValue(CATEGORY_OPTIONS, form.category)) {
+    errors.category = 'Elige la categoría del vehículo.';
+  }
+  if (!isValidPlate(form.plate)) {
+    errors.plate = 'La placa debe tener 3 letras y 3 números (ejemplo: ABC123).';
+  }
+  if (!isValidBrandOrModel(form.brand)) {
+    errors.brand = `Escribe la marca (máximo ${maxLength} caracteres).`;
+  }
+  if (!isValidBrandOrModel(form.model)) {
+    errors.model = `Escribe el modelo (máximo ${maxLength} caracteres).`;
+  }
+  if (!isValidVehicleYear(form.year, today)) {
+    errors.year = `Escribe un año de 4 números entre ${REGISTRATION_RULES.minVehicleYear} y ${today.getFullYear()}.`;
+  }
+  if (!isOptionValue(COLOR_OPTIONS, form.color)) {
+    errors.color = 'Elige el color.';
+  }
+  // La capacidad depende de la categoría: como los errores se calculan desde
+  // todo el formulario, si cambia la categoría este mensaje se actualiza solo.
+  if (!isValidCapacity(form.capacity, form.category)) {
+    const minimum = REGISTRATION_RULES.minCapacity[form.category];
+    errors.capacity =
+      minimum === undefined
+        ? 'Elige primero la categoría para saber la capacidad mínima.'
+        : `Escribe la capacidad: mínimo ${minimum} pasajeros para ${labelFor(CATEGORY_OPTIONS, form.category)}.`;
   }
 
   return errors;

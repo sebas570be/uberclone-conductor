@@ -1,5 +1,5 @@
 // src/utils/__tests__/registrationErrors.test.js
-import { getPersonalDataErrors, hasErrors } from '../registrationErrors';
+import { getPersonalDataErrors, getVehicleErrors, hasErrors } from '../registrationErrors';
 
 const TODAY = new Date(2026, 10, 6); // 6 de noviembre de 2026
 
@@ -35,5 +35,38 @@ describe('getPersonalDataErrors', () => {
   test('rechaza un género que no está en la lista', () => {
     const errors = getPersonalDataErrors({ ...VALID_PERSONAL_DATA, gender: 'hacker' }, TODAY);
     expect(errors.gender).toBeDefined();
+  });
+});
+
+const VALID_VEHICLE = {
+  category: 'economy',
+  plate: 'ABC123',
+  brand: 'Chevrolet',
+  model: 'Spark',
+  year: '2020',
+  color: 'white',
+  capacity: '4',
+};
+
+describe('getVehicleErrors', () => {
+  test('datos válidos: no hay errores', () => {
+    expect(getVehicleErrors(VALID_VEHICLE, TODAY)).toEqual({});
+  });
+
+  test('formulario vacío: hay un error en cada campo', () => {
+    const empty = { category: '', plate: '', brand: '', model: '', year: '', color: '', capacity: '' };
+    expect(Object.keys(getVehicleErrors(empty, TODAY)).sort()).toEqual(
+      ['brand', 'capacity', 'category', 'color', 'model', 'plate', 'year'].sort()
+    );
+  });
+
+  test('cambiar a XL con capacidad 4: aparece el error de capacidad sin borrarla', () => {
+    const errors = getVehicleErrors({ ...VALID_VEHICLE, category: 'xl' }, TODAY);
+    expect(errors.capacity).toBe('Escribe la capacidad: mínimo 6 pasajeros para XL.');
+  });
+
+  test('sin categoría: la capacidad pide elegir primero la categoría', () => {
+    const errors = getVehicleErrors({ ...VALID_VEHICLE, category: '' }, TODAY);
+    expect(errors.capacity).toBe('Elige primero la categoría para saber la capacidad mínima.');
   });
 });

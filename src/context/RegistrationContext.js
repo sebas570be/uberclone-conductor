@@ -5,16 +5,25 @@
 // Cuando el registro se envía, el estado cambia a "pending", RegisterTabs se
 // desmonta y este estado se borra solo (no quedan datos personales en memoria).
 import React, { createContext, useCallback, useMemo, useState } from 'react';
-import { getPersonalDataErrors } from '../utils/registrationErrors';
+import { getPersonalDataErrors, getVehicleErrors } from '../utils/registrationErrors';
 
-// Valores iniciales. Los campos de Vehículo y Documentos se agregan en sus commits.
+// Valores iniciales. Los campos de Documentos se agregan en su commit.
 const INITIAL_FORM = {
+  // Pestaña 1: datos personales
   fullName: '',
   documentNumber: '',
   phone: '',
   birthDate: null, // Date
   gender: '',
   language: 'es', // preseleccionado: es el idioma de la app
+  // Pestaña 2: vehículo (año y capacidad como texto, igual que en el TextInput)
+  category: '',
+  plate: '',
+  brand: '',
+  model: '',
+  year: '',
+  color: '',
+  capacity: '',
 };
 
 export const RegistrationContext = createContext(null);
@@ -44,10 +53,11 @@ export function RegistrationProvider({ children }) {
   // Los errores no se guardan en el estado: se calculan desde el formulario.
   // Así nunca quedan desactualizados respecto a lo que está escrito.
   const personalDataErrors = useMemo(() => getPersonalDataErrors(form), [form]);
+  const vehicleErrors = useMemo(() => getVehicleErrors(form), [form]);
 
   const value = useMemo(
-    () => ({ form, touched, personalDataErrors, setField, touchFields }),
-    [form, touched, personalDataErrors, setField, touchFields]
+    () => ({ form, touched, personalDataErrors, vehicleErrors, setField, touchFields }),
+    [form, touched, personalDataErrors, vehicleErrors, setField, touchFields]
   );
 
   return <RegistrationContext.Provider value={value}>{children}</RegistrationContext.Provider>;
