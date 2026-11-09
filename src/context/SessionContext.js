@@ -13,6 +13,10 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
 
 // Estados posibles del conductor, en el orden en que avanza.
+// Si Firestore solo tiene la respuesta de su caché ("no existe"), se espera
+// este tiempo a que conteste el servidor antes de decir "Sin conexión".
+const OFFLINE_WAIT_MS = 5000;
+
 export const DRIVER_STATUS = Object.freeze({
   SIGNED_OUT: 'signedOut', // sin sesión
   UNREGISTERED: 'unregistered', // tiene cuenta, pero no ha enviado el registro
@@ -43,7 +47,18 @@ export function SessionProvider({ children }) {
   useEffect(() => {
     // Escucha del documento del conductor; se cambia cada vez que cambia el usuario.
     let unsubscribeDriver = null;
+    // Temporizador del aviso "Sin conexión" (ver OFFLINE_WAIT_MS).
+    let offlineTimer = null;
+    const clearOfflineTimer = () => {
+      if (offlineTimer) {
+        clearTimeout(offlineTimer);
+        offlineTimer = null;
+      }
+    };
     const stopDriverListener = () => {
+      // Se cancela también el temporizador: si no, podría mostrar "Sin conexión"
+      // después de cerrar sesión o de cambiar de usuario.
+      clearOfflineTimer();
       if (unsubscribeDriver) {
         unsubscribeDriver();
         unsubscribeDriver = null;
@@ -66,15 +81,28 @@ export function SessionProvider({ children }) {
       setIsLoading(true);
       unsubscribeDriver = onSnapshot(
         doc(db, 'drivers', firebaseUser.uid),
+        // includeMetadataChanges: sin esto, cuando el servidor solo confirma lo
+        // que ya decía la caché ("no existe"), Firestore NO vuelve a llamar este
+        // callback y la app se quedaba en "Sin conexión" aunque hubiera internet.
+        { includeMetadataChanges: true },
         (snapshot) => {
-          // Sin conexión y sin datos guardados, Firestore responde "no existe" desde
-          // su caché local. Eso NO significa que no se haya registrado: es falta de
-          // conexión. Cuando vuelva internet llega la respuesta real y se corrige sola.
+          // "No existe" desde la caché local NO significa que no se haya registrado:
+          // puede ser que el servidor todavía no contesta. Se sigue mostrando la
+          // carga y solo si el servidor no responde en OFFLINE_WAIT_MS se avisa
+          // "Sin conexión". Cuando vuelva internet llega la respuesta real y se
+          // corrige sola (gracias a includeMetadataChanges).
           if (!snapshot.exists() && snapshot.metadata.fromCache) {
-            setError('Sin conexión. Conéctate a internet para cargar tu información.');
-            setIsLoading(false);
+            if (!offlineTimer) {
+              offlineTimer = setTimeout(() => {
+                offlineTimer = null;
+                setError('Sin conexión. Conéctate a internet para cargar tu información.');
+                setIsLoading(false);
+              }, OFFLINE_WAIT_MS);
+            }
             return;
           }
+          // Llegó una respuesta válida: ya no hace falta el aviso.
+          clearOfflineTimer();
           setDriverStatus(statusFromSnapshot(snapshot));
           setError(null);
           setIsLoading(false);
@@ -85,6 +113,7 @@ export function SessionProvider({ children }) {
           if (!auth.currentUser) {
             return;
           }
+          clearOfflineTimer();
           console.log('Error escuchando el documento del conductor:', snapshotError.code);
           setError('No se pudo cargar tu información. Revisa tu conexión e intenta de nuevo.');
           setIsLoading(false);
