@@ -10,25 +10,117 @@ service cloud.firestore {
     // Documento de cada conductor: drivers/{uid}
     match /drivers/{driverId} {
 
+      // ---------- Funciones de apoyo ----------
+
+      function isOwner() {
+        return request.auth != null && request.auth.uid == driverId;
+      }
+
+      // El mapa tiene EXACTAMENTE estos campos: hasOnly impide campos de más
+      // (por ejemplo "balance" o "rating") y hasAll impide que falte alguno.
+      function hasExactly(map, fields) {
+        return map.keys().hasOnly(fields) && map.keys().hasAll(fields);
+      }
+
+      // Los campos del documento (los que arma src/utils/driverDocument.js).
+      function hasDriverFields(data) {
+        return hasExactly(data, ['status', 'email', 'language', 'personal', 'vehicle',
+                                 'documents', 'payments', 'terms', 'createdAt']);
+      }
+
+      // URL de una foto: tiene que ser de NUESTRA cuenta de Cloudinary.
+      function isOurPhotoUrl(url) {
+        return url is string
+               && url.matches('^https://res[.]cloudinary[.]com/fg5qmtbv/image/upload/.+');
+      }
+
+      // La revisión técnico-mecánica: o no aplica (fecha y foto en null) o se
+      // envían las dos (fecha y foto de nuestra cuenta). Nunca una sin la otra.
+      function isValidTechnicalReview(documents) {
+        return (documents.technicalReviewExpiry == null && documents.technicalReviewPhotoUrl == null)
+               || (documents.technicalReviewExpiry is timestamp
+                   && isOurPhotoUrl(documents.technicalReviewPhotoUrl));
+      }
+
+      // Estructura y formato del registro (mismas reglas que la app, en el servidor).
+      // Se usa al crear Y al editar.
+      function isValidRegistration(data) {
+        return hasDriverFields(data)
+               // El correo de SU cuenta. lower() en los dos lados: nunca falla por mayúsculas.
+               && data.email is string
+               && data.email.lower() == request.auth.token.email.lower()
+               && data.language in ['es', 'en']
+               && hasExactly(data.personal, ['fullName', 'documentNumber', 'phone',
+                                             'birthDate', 'gender', 'photoUrl'])
+               && data.personal.fullName is string
+               && data.personal.fullName.size() > 0 && data.personal.fullName.size() <= 50
+               && data.personal.documentNumber.matches('^[0-9]{6,10}$')
+               && data.personal.phone.matches('^[0-9]{10}$')
+               && data.personal.birthDate is timestamp
+               && data.personal.gender in ['male', 'female', 'other', 'undisclosed']
+               && isOurPhotoUrl(data.personal.photoUrl)
+               && hasExactly(data.vehicle, ['category', 'plate', 'brand', 'model', 'year',
+                                            'color', 'capacity', 'photoUrl'])
+               && data.vehicle.category in ['economy', 'xl', 'premium']
+               && data.vehicle.plate.matches('^[A-Z]{3}[0-9]{3}$')
+               && data.vehicle.year is int
+               && data.vehicle.capacity is int
+               // Operador ternario: soportado por las reglas de Firestore desde 2020.
+               && data.vehicle.capacity >= (data.vehicle.category == 'xl' ? 6 : 4)
+               && isOurPhotoUrl(data.vehicle.photoUrl)
+               && hasExactly(data.documents, ['licenseNumber', 'licenseExpiry', 'licensePhotoUrl',
+                                              'soatExpiry', 'soatPhotoUrl',
+                                              'technicalReviewExpiry', 'technicalReviewPhotoUrl'])
+               && data.documents.licenseNumber.matches('^[0-9]{6,10}$')
+               && data.documents.licenseExpiry is timestamp
+               && data.documents.soatExpiry is timestamp
+               && isOurPhotoUrl(data.documents.licensePhotoUrl)
+               && isOurPhotoUrl(data.documents.soatPhotoUrl)
+               && isValidTechnicalReview(data.documents)
+               // Solo el correo de Mercado Pago: prohibido guardar cuentas o tarjetas.
+               && hasExactly(data.payments, ['mercadoPagoEmail'])
+               && data.payments.mercadoPagoEmail is string
+               && hasExactly(data.terms, ['accepted', 'commissionRate'])
+               && data.terms.accepted == true
+               && data.terms.commissionRate is number;
+      }
+
+      // Solo al CREAR: los documentos deben estar vigentes. Al editar no se exige,
+      // para que un conductor aprobado con un documento vencido pueda corregir
+      // sus datos (la vigencia la revisa quien aprueba).
+      function hasValidDocumentsToday(data) {
+        return data.documents.licenseExpiry > request.time
+               && data.documents.soatExpiry > request.time
+               && (data.documents.technicalReviewExpiry == null
+                   || data.documents.technicalReviewExpiry > request.time);
+      }
+
+      // ---------- Permisos ----------
+
       // Solo el propio conductor, con sesión iniciada, puede leer su documento.
-      allow read: if request.auth != null
-                  && request.auth.uid == driverId;
+      allow read: if isOwner();
 
-      // Al enviar el registro: solo su propio documento y SIEMPRE como "pending".
-      // Así nadie puede crearse ya aprobado desde la app.
-      allow create: if request.auth != null
-                    && request.auth.uid == driverId
-                    && request.resource.data.status == 'pending';
+      // Al enviar el registro: su propio documento, SIEMPRE como "pending",
+      // con datos válidos y documentos vigentes.
+      // createdAt == request.time: cuando la app envía serverTimestamp(), el
+      // servidor lo resuelve EXACTAMENTE a request.time. Así nadie puede poner
+      // una fecha de creación inventada.
+      allow create: if isOwner()
+                    && request.resource.data.status == 'pending'
+                    && request.resource.data.createdAt == request.time
+                    && isValidRegistration(request.resource.data)
+                    && hasValidDocumentsToday(request.resource.data);
 
-      // Editar su perfil: puede cambiar sus datos, pero NO su estado.
+      // Editar su perfil: puede cambiar sus datos (válidos), pero NO su estado
+      // ni la fecha de creación.
       // La aprobación se hace desde la consola (simulada en la BD, como dice el enunciado).
-      allow update: if request.auth != null
-                    && request.auth.uid == driverId
-                    && request.resource.data.status == resource.data.status;
+      allow update: if isOwner()
+                    && request.resource.data.status == resource.data.status
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && isValidRegistration(request.resource.data);
 
       // Cancelar el registro (el Delete del CRUD): solo mientras está pendiente.
-      allow delete: if request.auth != null
-                    && request.auth.uid == driverId
+      allow delete: if isOwner()
                     && resource.data.status == 'pending';
     }
 

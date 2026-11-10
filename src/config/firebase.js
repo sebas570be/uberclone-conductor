@@ -4,7 +4,7 @@
 // Estas llaves de la app web NO son secretas: lo que protege los datos son
 // las reglas de seguridad de Firestore.
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, getFirestore } from 'firebase/firestore';
 import { initializeAuth, getAuth, getReactNativePersistence } from 'firebase/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -29,7 +29,21 @@ if (missing.length > 0) {
 // Con Fast Refresh este archivo puede ejecutarse otra vez: si la app ya
 // existe se reutiliza, porque inicializarla dos veces da error.
 export const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+
+// Firestore con "long polling" (peticiones HTTP normales) en vez del canal de
+// streaming por defecto. En React Native ese canal puede no reconectarse
+// después de cerrar sesión y volver a entrar: Firestore queda "sin conexión"
+// y solo responde desde su caché, aunque haya internet.
+// Igual que auth, solo puede inicializarse una vez: con Fast Refresh se reutiliza.
+function createFirestore() {
+  try {
+    return initializeFirestore(app, { experimentalForceLongPolling: true });
+  } catch (error) {
+    return getFirestore(app);
+  }
+}
+
+export const db = createFirestore();
 
 // AI-assisted: see docs/AI_LOG.md #5
 // Sesión persistente (decisión D14): la sesión se guarda en AsyncStorage con el
