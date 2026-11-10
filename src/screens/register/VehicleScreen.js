@@ -2,11 +2,11 @@
 // Pestaña 2 del registro: vehículo (enunciado §2).
 // Igual que Datos personales: los datos viven en el RegistrationContext y el
 // error aparece debajo del campo al salir de él o al tocar "Siguiente".
-// La foto del vehículo se agrega en el commit de fotos (expo-image-picker).
 import React from 'react';
 import { ScrollView, Text, Pressable } from 'react-native';
 import TextField from '../../components/TextField';
 import SelectField from '../../components/SelectField';
+import PhotoField from '../../components/PhotoField';
 import { formStyles } from '../../components/formStyles';
 import useRegistration from '../../hooks/useRegistration';
 import { CATEGORY_OPTIONS, COLOR_OPTIONS, labelFor } from '../../constants/registrationOptions';
@@ -127,6 +127,17 @@ export default function VehicleScreen({ navigation }) {
         hint={capacityHint}
         keyboardType="number-pad"
         maxLength={2}
+      />
+
+      {/* Enunciado: la placa debe verse en la foto. No se puede verificar
+          automáticamente: se le pide al conductor y lo revisa quien aprueba. */}
+      <PhotoField
+        label="Foto del vehículo"
+        hint="Debe verse la placa."
+        value={form.vehiclePhoto}
+        onChange={(uri) => setField('vehiclePhoto', uri)}
+        onClose={touch('vehiclePhoto')}
+        error={errorFor('vehiclePhoto')}
       />
 
       <Pressable style={formStyles.primaryButton} onPress={handleNext} accessibilityRole="button">

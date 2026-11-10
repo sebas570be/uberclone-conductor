@@ -4,6 +4,7 @@ import { getPersonalDataErrors, getVehicleErrors, getDocumentsErrors, hasErrors 
 const TODAY = new Date(2026, 10, 6); // 6 de noviembre de 2026
 
 const VALID_PERSONAL_DATA = {
+  profilePhoto: 'file:///perfil.jpg',
   fullName: 'José Peña',
   documentNumber: '1234567890',
   phone: '3001234567',
@@ -20,10 +21,18 @@ describe('getPersonalDataErrors', () => {
   });
 
   test('formulario vacío: hay un error en cada campo', () => {
-    const empty = { fullName: '', documentNumber: '', phone: '', birthDate: null, gender: '', language: '' };
+    const empty = {
+      profilePhoto: null,
+      fullName: '',
+      documentNumber: '',
+      phone: '',
+      birthDate: null,
+      gender: '',
+      language: '',
+    };
     const errors = getPersonalDataErrors(empty, TODAY);
     expect(Object.keys(errors).sort()).toEqual(
-      ['birthDate', 'documentNumber', 'fullName', 'gender', 'language', 'phone'].sort()
+      ['birthDate', 'documentNumber', 'fullName', 'gender', 'language', 'phone', 'profilePhoto'].sort()
     );
   });
 
@@ -46,6 +55,7 @@ const VALID_VEHICLE = {
   year: '2020',
   color: 'white',
   capacity: '4',
+  vehiclePhoto: 'file:///vehiculo.jpg',
 };
 
 describe('getVehicleErrors', () => {
@@ -54,9 +64,9 @@ describe('getVehicleErrors', () => {
   });
 
   test('formulario vacío: hay un error en cada campo', () => {
-    const empty = { category: '', plate: '', brand: '', model: '', year: '', color: '', capacity: '' };
+    const empty = { category: '', plate: '', brand: '', model: '', year: '', color: '', capacity: '', vehiclePhoto: null };
     expect(Object.keys(getVehicleErrors(empty, TODAY)).sort()).toEqual(
-      ['brand', 'capacity', 'category', 'color', 'model', 'plate', 'year'].sort()
+      ['brand', 'capacity', 'category', 'color', 'model', 'plate', 'vehiclePhoto', 'year'].sort()
     );
   });
 
@@ -75,8 +85,11 @@ const VALID_DOCUMENTS = {
   year: '2024', // vehículo de 2 años: la revisión técnico-mecánica no aplica
   licenseNumber: '1234567890',
   licenseExpiry: new Date(2030, 0, 1),
+  licensePhoto: 'file:///licencia.jpg',
   soatExpiry: new Date(2027, 5, 1),
+  soatPhoto: 'file:///soat.jpg',
   technicalReviewExpiry: null,
+  technicalReviewPhoto: null,
   mercadoPagoEmail: 'conductor@gmail.com',
   termsAccepted: true,
 };
@@ -94,6 +107,13 @@ describe('getDocumentsErrors', () => {
   test('vehículo de 5 años o más: la revisión técnico-mecánica es obligatoria', () => {
     const errors = getDocumentsErrors({ ...VALID_DOCUMENTS, year: '2021' }, TODAY);
     expect(errors.technicalReviewExpiry).toBe('Elige la fecha de vencimiento de la revisión técnico-mecánica.');
+    expect(errors.technicalReviewPhoto).toBe('Agrega una foto de la revisión técnico-mecánica.');
+  });
+
+  test('sin foto de licencia ni del SOAT: hay error en cada una', () => {
+    const errors = getDocumentsErrors({ ...VALID_DOCUMENTS, licensePhoto: null, soatPhoto: null }, TODAY);
+    expect(errors.licensePhoto).toBeDefined();
+    expect(errors.soatPhoto).toBeDefined();
   });
 
   test('sin aceptar términos: no se puede enviar', () => {

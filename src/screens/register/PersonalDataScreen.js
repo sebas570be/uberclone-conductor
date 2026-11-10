@@ -3,12 +3,12 @@
 // Los datos viven en el RegistrationContext, no en esta pantalla: así no se
 // pierden al cambiar de pestaña. El error de cada campo aparece debajo de él
 // cuando el conductor sale del campo (onBlur) o toca "Siguiente".
-// La foto de perfil se agrega en el commit de fotos (expo-image-picker).
 import React from 'react';
 import { ScrollView, Text, Pressable } from 'react-native';
 import TextField from '../../components/TextField';
 import SelectField from '../../components/SelectField';
 import DateField from '../../components/DateField';
+import PhotoField from '../../components/PhotoField';
 import { formStyles } from '../../components/formStyles';
 import useRegistration from '../../hooks/useRegistration';
 import useSession from '../../hooks/useSession';
@@ -43,6 +43,14 @@ export default function PersonalDataScreen({ navigation }) {
       automaticallyAdjustKeyboardInsets // iOS: deja ver el campo cuando sale el teclado
     >
       <Text style={formStyles.step}>Paso 1 de 3</Text>
+
+      <PhotoField
+        label="Foto de perfil"
+        value={form.profilePhoto}
+        onChange={(uri) => setField('profilePhoto', uri)}
+        onClose={touch('profilePhoto')}
+        error={errorFor('profilePhoto')}
+      />
 
       <TextField
         label="Nombre completo"

@@ -10,7 +10,9 @@ import useSession from '../hooks/useSession';
 
 // Valores iniciales del formulario (las 3 pestañas).
 const INITIAL_FORM = {
+  // Fotos: uri local del celular; se suben a Cloudinary al enviar el registro.
   // Pestaña 1: datos personales
+  profilePhoto: null,
   fullName: '',
   documentNumber: '',
   phone: '',
@@ -25,11 +27,15 @@ const INITIAL_FORM = {
   year: '',
   color: '',
   capacity: '',
+  vehiclePhoto: null,
   // Pestaña 3: documentos y pagos (las fechas como Date)
   licenseNumber: '',
   licenseExpiry: null,
+  licensePhoto: null,
   soatExpiry: null,
+  soatPhoto: null,
   technicalReviewExpiry: null, // solo se exige si el vehículo tiene 5 años o más
+  technicalReviewPhoto: null,
   mercadoPagoEmail: '', // se prellena con el correo de la cuenta (ver abajo)
   termsAccepted: false,
 };

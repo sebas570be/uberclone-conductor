@@ -10,9 +10,7 @@ import {
   TextInput,
   Pressable,
   ActivityIndicator,
-  KeyboardAvoidingView,
   ScrollView,
-  Platform,
   StyleSheet,
 } from 'react-native';
 import { signIn, signUp, getAuthErrorMessage } from '../../services/authService';
@@ -68,62 +66,74 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
+    // Antes había un KeyboardAvoidingView: en iOS el teclado cambia de altura al
+    // escribir (barra de sugerencias y de contraseñas) y la pantalla brincaba con
+    // cada tecla. automaticallyAdjustKeyboardInsets solo ajusta el área de scroll,
+    // sin mover el diseño (igual que en las pestañas del registro).
+    <ScrollView
       style={styles.flex}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      contentContainerStyle={styles.container}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      automaticallyAdjustKeyboardInsets
     >
-      <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
-        <Text style={styles.subtitle}>UberClone · Conductor</Text>
+      <Text style={styles.title}>{isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
+      <Text style={styles.subtitle}>UberClone · Conductor</Text>
 
-        <Text style={styles.label}>Correo</Text>
-        <TextInput
-          style={[styles.input, errors.email && styles.inputError]}
-          value={email}
-          onChangeText={setEmail}
-          placeholder="nombre@gmail.com"
-          keyboardType="email-address"
-          autoCapitalize="none"
-          autoCorrect={false}
-          autoComplete="email"
-          accessibilityLabel="Correo"
-        />
-        {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+      <Text style={styles.label}>Correo</Text>
+      <TextInput
+        style={[styles.input, errors.email && styles.inputError]}
+        value={email}
+        onChangeText={setEmail}
+        placeholder="nombre@gmail.com"
+        keyboardType="email-address"
+        autoCapitalize="none"
+        autoCorrect={false}
+        autoComplete="email"
+        textContentType="emailAddress"
+        returnKeyType="done"
+        accessibilityLabel="Correo"
+      />
+      {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
 
-        <Text style={styles.label}>Contraseña</Text>
-        <TextInput
-          style={[styles.input, errors.password && styles.inputError]}
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Mínimo 6 caracteres"
-          secureTextEntry
-          autoCapitalize="none"
-          accessibilityLabel="Contraseña"
-        />
-        {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+      <Text style={styles.label}>Contraseña</Text>
+      <TextInput
+        style={[styles.input, errors.password && styles.inputError]}
+        value={password}
+        onChangeText={setPassword}
+        placeholder="Mínimo 6 caracteres"
+        secureTextEntry
+        autoCapitalize="none"
+        // iOS: le dice qué tipo de campo es (contraseña guardada o nueva), así
+        // no cambia la barra de sugerencias a cada rato.
+        textContentType={isSignUp ? 'newPassword' : 'password'}
+        autoComplete={isSignUp ? 'new-password' : 'current-password'}
+        returnKeyType="done"
+        accessibilityLabel="Contraseña"
+      />
+      {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
 
-        <Pressable
-          style={[styles.button, isLoading && styles.buttonDisabled]}
-          onPress={handleSubmit}
-          disabled={isLoading}
-          accessibilityRole="button"
-        >
-          {isLoading ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <Text style={styles.buttonText}>{isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
-          )}
-        </Pressable>
+      <Pressable
+        style={[styles.button, isLoading && styles.buttonDisabled]}
+        onPress={handleSubmit}
+        disabled={isLoading}
+        accessibilityRole="button"
+      >
+        {isLoading ? (
+          <ActivityIndicator color="#FFFFFF" />
+        ) : (
+          <Text style={styles.buttonText}>{isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
+        )}
+      </Pressable>
 
-        {formError && <Text style={styles.errorText}>{formError}</Text>}
+      {formError && <Text style={styles.errorText}>{formError}</Text>}
 
-        <Pressable onPress={toggleMode} disabled={isLoading} accessibilityRole="button">
-          <Text style={styles.link}>
-            {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Crea una'}
-          </Text>
-        </Pressable>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      <Pressable onPress={toggleMode} disabled={isLoading} accessibilityRole="button">
+        <Text style={styles.link}>
+          {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Crea una'}
+        </Text>
+      </Pressable>
+    </ScrollView>
   );
 }
 

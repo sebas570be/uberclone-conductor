@@ -2,12 +2,13 @@
 // Pestaña 3 del registro: documentos y pagos (enunciado §2) y el botón
 // "Enviar registro", que guarda todo en Firestore con estado "pending".
 // El botón está deshabilitado hasta que las 3 pestañas estén completas y válidas.
-// Las fotos de licencia, SOAT y revisión se agregan en el commit de fotos.
+// Las fotos se suben a Cloudinary al tocar "Enviar registro" (ver driverService).
 import React, { useState } from 'react';
 import { ScrollView, View, Text, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import TextField from '../../components/TextField';
 import DateField from '../../components/DateField';
 import CheckboxField from '../../components/CheckboxField';
+import PhotoField from '../../components/PhotoField';
 import { formStyles } from '../../components/formStyles';
 import useRegistration from '../../hooks/useRegistration';
 import useSession from '../../hooks/useSession';
@@ -30,6 +31,8 @@ export default function DocumentsScreen({ navigation }) {
     useRegistration();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
+  // Detalle técnico del error: solo se muestra en desarrollo (__DEV__), nunca en la APK.
+  const [submitDetail, setSubmitDetail] = useState(null);
 
   const errorFor = (name) => (touched[name] ? documentsErrors[name] : undefined);
   const touch = (name) => () => touchFields([name]);
@@ -44,14 +47,17 @@ export default function DocumentsScreen({ navigation }) {
 
   const handleSubmit = async () => {
     setSubmitError(null);
+    setSubmitDetail(null);
     setIsSubmitting(true);
     try {
       // Al guardarse, el SessionContext ve el documento y la app pasa sola a
       // "Pendiente de aprobación": no hay que navegar.
       await submitRegistration(user.uid, user.email, form);
     } catch (error) {
-      console.log('Error al enviar el registro:', error.code);
+      // Se imprime el código, el tipo y el mensaje: algunos errores no traen código.
+      console.log('Error al enviar el registro:', error?.code, error?.name, error?.message);
       setSubmitError(getDriverErrorMessage(error));
+      setSubmitDetail(`${error?.name ?? 'Error'} | código: ${error?.code ?? 'sin código'} | ${error?.message ?? ''}`);
       setIsSubmitting(false);
     }
   };
@@ -87,6 +93,14 @@ export default function DocumentsScreen({ navigation }) {
         minimumDate={tomorrow()}
       />
 
+      <PhotoField
+        label="Foto de la licencia"
+        value={form.licensePhoto}
+        onChange={(uri) => setField('licensePhoto', uri)}
+        onClose={touch('licensePhoto')}
+        error={errorFor('licensePhoto')}
+      />
+
       <DateField
         label="Vencimiento del SOAT"
         value={form.soatExpiry}
@@ -97,16 +111,33 @@ export default function DocumentsScreen({ navigation }) {
         minimumDate={tomorrow()}
       />
 
+      <PhotoField
+        label="Foto del SOAT"
+        value={form.soatPhoto}
+        onChange={(uri) => setField('soatPhoto', uri)}
+        onClose={touch('soatPhoto')}
+        error={errorFor('soatPhoto')}
+      />
+
       {needsTechnicalReview ? (
-        <DateField
-          label="Vencimiento de la revisión técnico-mecánica"
-          value={form.technicalReviewExpiry}
-          onChange={(date) => setField('technicalReviewExpiry', date)}
-          onClose={touch('technicalReviewExpiry')}
-          error={errorFor('technicalReviewExpiry')}
-          defaultDate={tomorrow()}
-          minimumDate={tomorrow()}
-        />
+        <>
+          <DateField
+            label="Vencimiento de la revisión técnico-mecánica"
+            value={form.technicalReviewExpiry}
+            onChange={(date) => setField('technicalReviewExpiry', date)}
+            onClose={touch('technicalReviewExpiry')}
+            error={errorFor('technicalReviewExpiry')}
+            defaultDate={tomorrow()}
+            minimumDate={tomorrow()}
+          />
+          <PhotoField
+            label="Foto de la revisión técnico-mecánica"
+            value={form.technicalReviewPhoto}
+            onChange={(uri) => setField('technicalReviewPhoto', uri)}
+            onClose={touch('technicalReviewPhoto')}
+            error={errorFor('technicalReviewPhoto')}
+          />
+        </>
       ) : (
         <Text style={[formStyles.hint, styles.notice]}>
           Revisión técnico-mecánica: no aplica, tu vehículo tiene menos de{' '}
@@ -144,12 +175,15 @@ export default function DocumentsScreen({ navigation }) {
         accessibilityState={{ disabled: !canSubmit }}
       >
         {isSubmitting ? (
-          <ActivityIndicator color="#FFFFFF" />
+          <ActivityIndicator color="#FFFFFF" accessibilityLabel="Subiendo fotos y enviando el registro" />
         ) : (
           <Text style={formStyles.primaryButtonText}>Enviar registro</Text>
         )}
       </Pressable>
 
+      {isSubmitting ? (
+        <Text style={[formStyles.hint, styles.center]}>Subiendo las fotos y enviando… puede tardar unos segundos.</Text>
+      ) : null}
       {!canSubmit && !isSubmitting ? (
         <Text style={[formStyles.hint, styles.center]}>Completa las 3 pestañas para poder enviar.</Text>
       ) : null}
@@ -158,6 +192,7 @@ export default function DocumentsScreen({ navigation }) {
           <Text style={[formStyles.errorText, styles.center]} accessibilityLiveRegion="polite">
             {submitError}
           </Text>
+          {__DEV__ && submitDetail ? <Text style={[formStyles.hint, styles.center]}>{submitDetail}</Text> : null}
         </View>
       ) : null}
 

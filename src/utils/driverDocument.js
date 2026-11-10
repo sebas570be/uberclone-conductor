@@ -3,10 +3,12 @@
 // Firestore (drivers/{uid}). Es una función pura: no toca Firebase, así que
 // se prueba con Jest. El service (driverService) le agrega las fechas del servidor.
 // Estructura agrupada como las 3 pestañas: personal, vehicle, documents, payments.
+// photoUrls trae las URL de Cloudinary (las fotos ya subidas), no las del celular.
 import { PRICING } from '../config/pricing';
 import { requiresTechnicalReview } from './validators';
 
-export function buildDriverDocument(form, accountEmail, today = new Date()) {
+export function buildDriverDocument(form, accountEmail, photoUrls, today = new Date()) {
+  const needsTechnicalReview = requiresTechnicalReview(form.year, today);
   return {
     // Siempre "pending": el conductor no puede aprobarse solo (las reglas de
     // Firestore también lo exigen al crear el documento).
@@ -19,6 +21,7 @@ export function buildDriverDocument(form, accountEmail, today = new Date()) {
       phone: form.phone,
       birthDate: form.birthDate, // Date → Firestore lo guarda como Timestamp
       gender: form.gender,
+      photoUrl: photoUrls.profile,
     },
     vehicle: {
       category: form.category,
@@ -28,13 +31,17 @@ export function buildDriverDocument(form, accountEmail, today = new Date()) {
       year: Number(form.year), // en el formulario es texto; en la base, número
       color: form.color,
       capacity: Number(form.capacity),
+      photoUrl: photoUrls.vehicle,
     },
     documents: {
       licenseNumber: form.licenseNumber,
       licenseExpiry: form.licenseExpiry,
+      licensePhotoUrl: photoUrls.license,
       soatExpiry: form.soatExpiry,
+      soatPhotoUrl: photoUrls.soat,
       // Si no aplica para la edad del vehículo se guarda null (no una fecha vieja).
-      technicalReviewExpiry: requiresTechnicalReview(form.year, today) ? form.technicalReviewExpiry : null,
+      technicalReviewExpiry: needsTechnicalReview ? form.technicalReviewExpiry : null,
+      technicalReviewPhotoUrl: needsTechnicalReview ? photoUrls.technicalReview : null,
     },
     payments: {
       // Solo el correo de Mercado Pago: el enunciado prohíbe guardar cuentas o tarjetas.

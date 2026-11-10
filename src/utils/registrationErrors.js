@@ -30,6 +30,9 @@ import {
 export function getPersonalDataErrors(form, today = new Date()) {
   const errors = {};
 
+  if (!form.profilePhoto) {
+    errors.profilePhoto = 'Agrega tu foto de perfil.';
+  }
   if (!isValidFullName(form.fullName)) {
     errors.fullName = `Escribe tu nombre completo: solo letras y espacios, máximo ${REGISTRATION_RULES.maxNameLength}.`;
   }
@@ -78,6 +81,9 @@ export function getVehicleErrors(form, today = new Date()) {
   }
   // La capacidad depende de la categoría: como los errores se calculan desde
   // todo el formulario, si cambia la categoría este mensaje se actualiza solo.
+  if (!form.vehiclePhoto) {
+    errors.vehiclePhoto = 'Agrega una foto del vehículo donde se vea la placa.';
+  }
   if (!isValidCapacity(form.capacity, form.category)) {
     const minimum = REGISTRATION_RULES.minCapacity[form.category];
     errors.capacity =
@@ -106,15 +112,18 @@ export function getDocumentsErrors(form, today = new Date()) {
   }
   const licenseError = expiryError(form.licenseExpiry, today, 'de la licencia');
   if (licenseError) errors.licenseExpiry = licenseError;
+  if (!form.licensePhoto) errors.licensePhoto = 'Agrega una foto de tu licencia.';
 
   const soatError = expiryError(form.soatExpiry, today, 'del SOAT');
   if (soatError) errors.soatExpiry = soatError;
+  if (!form.soatPhoto) errors.soatPhoto = 'Agrega una foto del SOAT.';
 
   // La revisión técnico-mecánica solo se exige si el vehículo tiene 5 años o
   // más (regla en src/config/registration.js). Si no aplica, no hay error.
   if (requiresTechnicalReview(form.year, today)) {
     const reviewError = expiryError(form.technicalReviewExpiry, today, 'de la revisión técnico-mecánica');
     if (reviewError) errors.technicalReviewExpiry = reviewError;
+    if (!form.technicalReviewPhoto) errors.technicalReviewPhoto = 'Agrega una foto de la revisión técnico-mecánica.';
   }
 
   if (!isValidEmail(form.mercadoPagoEmail)) {
