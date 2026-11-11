@@ -124,6 +124,54 @@ service cloud.firestore {
                     && resource.data.status == 'pending';
     }
 
+    // Disponibilidad y ubicación en tiempo real: driverLocations/{uid}
+    // Colección aparte del registro: se escribe cada 5 s y no expone datos personales.
+    match /driverLocations/{driverId} {
+
+      function isOwner() {
+        return request.auth != null && request.auth.uid == driverId;
+      }
+
+      // R6 del enunciado, verificado en el SERVIDOR: solo un conductor aprobado
+      // puede ponerse Disponible. get() lee su documento del registro.
+      function isApprovedDriver() {
+        return get(/databases/$(database)/documents/drivers/$(request.auth.uid)).data.status == 'approved';
+      }
+
+      function isValidCoordinates(location) {
+        return location is map
+               && location.keys().hasOnly(['latitude', 'longitude'])
+               && location.keys().hasAll(['latitude', 'longitude'])
+               && location.latitude is number
+               && location.latitude >= -90 && location.latitude <= 90
+               && location.longitude is number
+               && location.longitude >= -180 && location.longitude <= 180;
+      }
+
+      // Campos exactos y coherentes: Disponible = con ubicación;
+      // No disponible = ubicación en null (no se guarda dónde está si no trabaja).
+      function isValidLocationDocument(data) {
+        return data.keys().hasOnly(['isAvailable', 'location', 'updatedAt'])
+               && data.keys().hasAll(['isAvailable', 'location', 'updatedAt'])
+               && data.isAvailable is bool
+               && data.updatedAt == request.time   // hora del servidor (serverTimestamp)
+               && ((data.isAvailable == false && data.location == null)
+                   || (data.isAvailable == true && isValidCoordinates(data.location)));
+      }
+
+      // Solo el propio conductor lee su ubicación (la app del pasajero se
+      // agregará con su propia regla cuando exista).
+      allow read: if isOwner();
+
+      // Escribir: su propio documento, con datos válidos. Ponerse Disponible
+      // exige estar aprobado; marcarse No disponible siempre se permite.
+      allow create, update: if isOwner()
+                            && isValidLocationDocument(request.resource.data)
+                            && (request.resource.data.isAvailable == false || isApprovedDriver());
+
+      allow delete: if false;
+    }
+
     // Todo lo demás (por ejemplo, "trips") sigue cerrado hasta su rama:
     // lo que no está permitido explícitamente queda prohibido.
   }

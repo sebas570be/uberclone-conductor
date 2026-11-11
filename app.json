@@ -28,6 +28,12 @@
           "photosPermission": "UberClone Conductor necesita acceder a tus fotos para que subas tu foto de perfil, la del vehículo y las de tus documentos.",
           "cameraPermission": "UberClone Conductor necesita la cámara para tomar tu foto de perfil, la del vehículo y las de tus documentos."
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "UberClone Conductor usa tu ubicación para mostrarte en el mapa y compartirla mientras estás Disponible para recibir solicitudes."
+        }
       ]
     ]
   }
