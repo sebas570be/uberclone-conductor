@@ -78,7 +78,7 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - [x] Registro del conductor (datos personales, vehículo, documentos y fotos) guardado en Firestore con estado pendiente
 - [x] Reglas de seguridad de Firestore que validan el registro y la ubicación
 - [x] Disponibilidad y ubicación en tiempo real
-- [ ] Solicitudes con tiempo límite
+- [x] Solicitudes con tiempo límite
 - [ ] Navegación al punto de recogida y al destino
 - [ ] Cobro con Mercado Pago y en efectivo
 - [ ] Historial y resumen de ganancias
