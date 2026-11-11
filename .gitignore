@@ -34,6 +34,11 @@ yarn-error.*
 .env
 .env*.local
 
+# Credencial de administrador de Firebase (cuenta de servicio): SECRETA.
+# Da acceso total al proyecto; solo vive en el PC, nunca en Git.
+backend/serviceAccountKey.json
+*-firebase-adminsdk-*.json
+
 # typescript
 *.tsbuildinfo
 

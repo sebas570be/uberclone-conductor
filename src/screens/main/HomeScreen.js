@@ -3,18 +3,21 @@
 // ubicación actual y el interruptor Disponible / No disponible.
 // Solo se llega aquí con status "approved" (RootNavigator), y las reglas de
 // Firestore también lo exigen para escribir en driverLocations (R6).
+// Mientras está Disponible escucha las solicitudes (useTripRequests) y, cuando
+// llega una, abre la pantalla Solicitud.
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Switch, Pressable, ActivityIndicator, Linking, StyleSheet } from 'react-native';
 import MapView from 'react-native-maps';
 import { useIsFocused } from '@react-navigation/native';
 import useSession from '../../hooks/useSession';
 import useDriverLocation, { LOCATION_STATUS } from '../../hooks/useDriverLocation';
+import useTripRequests from '../../hooks/useTripRequests';
 import { getLastAvailability, saveLastAvailability } from '../../services/preferencesService';
 
 // Zoom del mapa (grados visibles): ~1 km a la redonda.
 const MAP_DELTA = { latitudeDelta: 0.01, longitudeDelta: 0.01 };
 
-export default function HomeScreen() {
+export default function HomeScreen({ navigation }) {
   const { user } = useSession();
   const uid = user?.uid;
   // En el Drawer esta pantalla NO se desmonta al ir a otra: useIsFocused dice
@@ -38,6 +41,18 @@ export default function HomeScreen() {
   }, [uid]);
 
   const { position, status, retry } = useDriverLocation(isAvailable && isFocused && isPreferenceLoaded);
+
+  // Solicitudes: solo se escuchan con la misma condición con la que se envía la
+  // ubicación (Disponible, en Inicio y con GPS listo). Al abrir la Solicitud,
+  // Inicio pierde el foco: deja de escuchar y de enviar ubicación, así no llega
+  // una segunda solicitud mientras el conductor decide.
+  const tripRequest = useTripRequests(
+    isAvailable && isFocused && isPreferenceLoaded && status === LOCATION_STATUS.READY
+  );
+
+  useEffect(() => {
+    if (tripRequest) navigation.navigate('TripRequest', { trip: tripRequest });
+  }, [tripRequest, navigation]);
 
   // useCallback: la función no se recrea en cada render (se pasa al Switch).
   const handleToggle = useCallback(

@@ -676,3 +676,93 @@ Ya monté el esqueleto de navegación que revisamos y lo probé en mi iPhone con
 - Archivos y commit: src/config/location.js, src/utils/locationDocument.js, src/utils/__tests__/locationDocument.test.js, src/services/locationService.js, src/services/preferencesService.js, src/hooks/useDriverLocation.js, src/screens/main/HomeScreen.js, src/navigation/TripStack.js, src/navigation/MainDrawer.js, firestore.rules, app.json, README.md — commit "Agregar pantalla Inicio con mapa, interruptor Disponible y envio de ubicacion en tiempo real a driverLocations, con reglas y entrada 9 de la bitacora"
 - Verificación: En el iPhone con la cuenta prueba1 (approved): el mapa muestra el punto azul con la ubicación; al activar Disponible, driverLocations/{uid} queda con isAvailable true, la ubicación y updatedAt cambiando cada ~5 s (captura 54, con las coordenadas tapadas); al ir a Historial queda isAvailable false y location null (captura 53) y al volver a Inicio se reanuda; al cerrar y abrir Expo Go, Inicio abre ya en Disponible (AsyncStorage); al tocar Cerrar sesión queda isAvailable false y location null.
 - Aprendizaje: La limpieza de un useEffect no es solo "apagar": hay que pensar qué pasa si algo asíncrono termina después (la suscripción del GPS que llega tarde) y en qué orden ocurren las cosas (marcar No disponible antes de cerrar sesión, porque después las reglas ya no lo permiten). También aprendí que una pantalla del Drawer no se desmonta al cambiar de opción, por eso hace falta useIsFocused. Otra vez la IA propuso un "ahorro" que rompía la seguridad (quitar el get() de las reglas), y solo se detectó pensando cómo lo usaría alguien que no está aprobado.
+
+### Entrada #10
+
+- **Fecha:** 10–11/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramienta:** Claude (Anthropic), en conversación; sin revisión de Gemini por decisión propia.
+- **Objetivo:** Crear un simulador de la "app del pasajero" (que no existe en este proyecto) para generar solicitudes de viaje (`trips` en estado `requested`) que la app del conductor pueda recibir, sin poner la llave de administrador dentro de la app, y las reglas de Firestore que permiten al conductor leer y responder solo sus solicitudes.
+
+- **Prompt (textual, mensajes principales):**
+  1. "yo elijo la A y si las dos proppuestas estan ben siempre y cuando las resolvamos con teoria de clase" (opción A: backend Node aparte con un script que crea las solicitudes).
+  2. "apruebo las 3" (origen a ≤ 1 km del conductor y destino a 2–6 km; direcciones con Nominatim; método de pago aleatorio o forzado por argumento).
+  3. "si quiero las dos mejoras, pero la de descricion mas compelta" (mostrar por qué se descarta cada conductor; dirección más completa).
+  4. "aporbado" (reintento ante fallos de red pasajeros) y "aprobado" (sacar el reintento a un cliente HTTP compartido).
+  5. "1A, 5 s" (respuesta con un solo campo `respondedAt`; margen de 5 s para aceptar) y "aprobado sin gemin" (reglas de `trips`).
+
+- **Resumen:** Claude propuso el diseño del documento `trips` según el enunciado (§6) y el código del backend: config, conexión de administrador, servicios de rutas (OSRM) y direcciones (Nominatim), funciones puras y el script `npm run solicitud`. Las pruebas reales mostraron tres problemas (cuenta sin categoría, dirección muy corta, fallos de red intermitentes) que se resolvieron con mejoras aprobadas una por una. Después propuso las reglas de `trips` con mínimo privilegio, probadas en el Área de prueba de reglas.
+
+- **Qué se usó / modificó / descartó:**
+  - **Se usó:** backend Node separado con `firebase-admin` + `dotenv`. La llave se lee desde una ruta en `backend/.env`; ninguno de los dos va a Git.
+  - **Se usó:** OSRM y Nominatim en vez de Google, porque Directions/Distance Matrix son *Legacy* y Routes API exige facturación (el enunciado §7 permite OSRM/Nominatim).
+  - **Se usó:** el script revisa lo mismo que las reglas (`approved`, ubicación < 30 s, categoría válida, sin viaje activo), porque `firebase-admin` se salta las reglas.
+  - **Se usó:** la tarifa NO se guarda en la solicitud; la app la calculará con `calculateFare` (la misma función al estimar y al cobrar).
+  - **Se usó:** reglas de `trips` con mínimo privilegio: el conductor solo lee sus viajes; solo puede pasar `requested` → `accepted`/`rejected`; solo cambian `status` y `respondedAt` (`diff().affectedKeys()`); `respondedAt` es la hora del servidor; aceptar solo hasta 20 s después de `createdAt` (15 s + 5 s de margen), verificado en el servidor; crear y borrar solo desde el backend.
+  - **Se modificó (tras pruebas):** motivo de descarte por conductor; dirección "Lugar, Calle # número, Barrio, Ciudad" con respaldo en `display_name`; cliente HTTP compartido (`httpClient.js`) con timeout, 1 reintento (red, 429, 5xx; no 400/404) y la causa real del error (`error.cause`).
+  - **Se descartó:** importar `src/config/location.js` desde el backend (usa `export` y el backend usa `require`); el valor de 30 s se repite con un comentario que indica su origen.
+  - **Se descartó:** cambiar la configuración de red de Node (IPv6) sin pruebas: tres pruebas directas a OSRM respondieron bien, así que solo se agregó el reintento y la causa del error.
+  - **Se descartó:** aprobar `install-scripts` de `@firebase/util` y `protobufjs` (no se necesitan; mínimo privilegio).
+  - **Se descartó:** dos campos `acceptedAt`/`rejectedAt` (con uno basta: el `status` dice cuál fue la respuesta).
+
+- **Archivos y commit:** backend: `.gitignore`, `backend/package.json`, `backend/package-lock.json`, `backend/.env.example`, `backend/README.md`, `backend/scripts/createTripRequest.js`, `backend/src/config.js`, `backend/src/firebaseAdmin.js`, `backend/src/services/httpClient.js`, `backend/src/services/routeService.js`, `backend/src/services/geocodingService.js`, `backend/src/utils/tripRequest.js` — commit `094c422`. Reglas: `firestore.rules` — commit `1a3ab66`.
+
+- **Verificación:**
+  - Revisión de sintaxis de todos los archivos y pruebas con datos simulados: puntos aleatorios siempre entre 200 y 1000 m; 8.500 m / 1.320 s → 8,5 km / 22 min; ruta de 0 km rechazada; método de pago inválido rechazado; 6 casos de dirección; 7 casos de reintento (fallo de red, 429, 503, 400, respuesta sin ruta, éxito).
+  - Pruebas reales con `npm run solicitud` y el iPhone en Disponible:
+    - prueba1 fue descartada por no tener categoría de vehículo (cuenta anterior al formulario); se aprobó prueba2 en la consola, como indica R6.
+    - Con un viaje activo, el script mostró "ya tiene un viaje activo" con el id del viaje.
+    - Se crearon viajes en `trips` con `status: "requested"`, `distanceKm`, `durationMin` entero, `routePolyline`, `passengerId: "simulated-passenger"` y `createdAt`, revisados campo por campo en la consola de Firebase.
+    - Hubo dos fallos reales `fetch failed` (uno en Nominatim, otro en OSRM) antes del reintento; después del cliente compartido, el viaje se creó con las dos direcciones legibles.
+  - `git add --dry-run` confirmó que la llave, `.env` y `node_modules` no entran al repositorio.
+  - Reglas de `trips` en el Área de prueba de reglas de la consola: `get` del conductor dueño → permitido; `get` de otro conductor, `create`, `delete` y `update` de una solicitud vencida → denegados. El caso positivo (aceptar/rechazar a tiempo con `serverTimestamp`) no se puede simular ahí y se prueba desde la app en el commit siguiente.
+
+- **Aprendizaje:**
+  - Un servidor con permisos de administrador debe validar por sí mismo lo que las reglas validarían.
+  - Separar "obligatorio" de "opcional": sin ruta no hay solicitud; sin dirección se usan coordenadas.
+  - Un mensaje de error útil dice qué pasó y cómo arreglarlo: el motivo de descarte habría ahorrado dos diagnósticos.
+  - El reintento va en un solo lugar, para que ningún servicio se quede sin él.
+  - Los datos de prueba también deben estar completos.
+  - El temporizador del celular no es una garantía: el plazo para aceptar se verifica también en el servidor.
+
+### Entrada #11
+
+- **Fecha:** 11/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramienta:** Claude (Anthropic), en conversación; sin revisión de Gemini.
+- **Objetivo:** Recibir en la app las solicitudes de viaje en tiempo real y mostrarlas en la pantalla Solicitud (S2) con la tarifa y la ganancia estimadas, un temporizador de 15 s y los botones Aceptar / Rechazar, usando el hook obligatorio `useTripRequests`.
+
+- **Prompt (textual, mensajes principales):**
+  1. "las dos recoemndadas" (el tiempo se cuenta desde `createdAt`, la misma referencia de las reglas; las solicitudes vencidas con la app cerrada las rechaza la app al abrir).
+  2. "aprobado" (código de la pantalla, el hook, el servicio y las funciones puras).
+
+- **Resumen:** Claude propuso la estructura por capas (config, funciones puras con pruebas, servicio de Firestore, hook y pantalla) y el código. La pantalla calcula la estimación con `calculateFare` (la misma función del cobro final), cuenta 15 s desde `createdAt` y rechaza sola al llegar a 0. El hook rechaza sin mostrarlas las solicitudes vencidas o con datos inválidos.
+
+- **Qué se usó / modificó / descartó:**
+  - **Se usó:** `parseTripRequest` valida los datos que llegan de Firestore (tipos, categoría, método de pago, km y min > 0, direcciones, fecha) antes de usarlos; con `hasOwnProperty` y no `in`, para que "constructor" no pase como categoría.
+  - **Se usó:** temporizador desde `createdAt` con `getSecondsLeft` (nunca menos de 0 ni más de 15); `setInterval` con cleanup (H2).
+  - **Se usó:** `useCallback` para Aceptar y Rechazar (H5), `useMemo` para la estimación y `useRef` para que no se responda dos veces (doble toque o rechazo automático justo después de aceptar).
+  - **Se usó:** la pantalla Solicitud sin botón ni gesto de "atrás": el conductor debe responder. Al aceptar se usa `replace` para no volver a una solicitud ya aceptada.
+  - **Se usó:** si las reglas niegan la respuesta (`permission-denied`), se muestra "La solicitud ya venció o ya no está disponible" y no se reintenta; si es un error de red, se puede reintentar.
+  - **Se descartó:** contar los 15 s desde que la solicitud llega al celular (podía mostrar tiempo que el servidor ya no acepta).
+  - **Se descartó:** limpiar las solicitudes vencidas desde el backend (basta con la app: el script solo elige conductores con la app abierta en Inicio).
+  - **Se descartó:** el mapa con la ruta en esta pantalla (S2 pide datos; la ruta se dibuja en la rama del viaje).
+  - **Se descartó:** una marca `AI-assisted` agregada en `HomeScreen.js` sin aprobación; se revirtió y el archivo quedó como se aprobó.
+
+- **Archivos y commit:** `src/config/tripRequest.js`, `src/utils/tripRequestData.js`, `src/utils/__tests__/tripRequestData.test.js`, `src/services/tripService.js`, `src/hooks/useTripRequests.js`, `src/screens/main/TripRequestScreen.js`, `src/screens/main/HomeScreen.js`, `src/navigation/TripStack.js` — commit "feat(solicitudes): useTripRequests y pantalla de solicitud con temporizador de 15 s".
+
+- **Verificación:**
+  - `npm test`: 64 pruebas pasando (14 nuevas: documento válido, distancia 0/negativa/texto, categoría o pago desconocidos, sin dirección o sin fecha, estado distinto, segundos restantes 15/13/1/0, reloj atrasado, formato de pesos).
+  - En el iPhone con prueba2 y `npm run solicitud`:
+    1. Solicitud vencida de antes: se rechazó sola al ponerse Disponible, sin mostrarse (`rejected` con `respondedAt`).
+    2. Aceptar: `accepted` 5 s después de `createdAt`; se abrió "Viaje en curso". Prueba el caso positivo de las reglas que el Área de prueba no podía simular.
+    3. Rechazar: `rejected`; volvió a Inicio.
+    4. Sin tocar: el temporizador se puso rojo en los últimos 5 s; en 0 quedó `rejected` y volvió solo a Inicio.
+  - Tarifas de la pantalla comparadas a mano con la fórmula: 7 km/16 min → 15.900 / 3.180 / 12.720; 5,4 km/10 min → 12.480 redondeado a 12.500 / 2.500 / 10.000; 6,2 km/14 min → 14.440 redondeado a 14.400 / 2.880 / 11.520.
+  - En el commit 1 de la rama, el reintento mostró la causa real de los fallos de red intermitentes: `ENOTFOUND` (DNS de la red local), no del código.
+
+- **Aprendizaje:**
+  - El celular y el servidor deben usar la misma referencia de tiempo: si el temporizador cuenta distinto que las reglas, la app puede prometer tiempo que el servidor no acepta.
+  - Una solicitud que nadie responde no debe quedar abierta para siempre: el sistema debe cerrarla.
+  - `useRef` sirve para lo que debe cambiar al instante sin volver a dibujar la pantalla (evitar dos respuestas).
+  - Lo que se monta debe ser exactamente lo aprobado.
