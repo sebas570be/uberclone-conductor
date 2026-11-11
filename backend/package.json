@@ -1,0 +1,17 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Backend Node del UberClone Conductor: simula la app del pasajero (crea solicitudes de viaje con rutas de OSRM) y, más adelante, crea la preferencia de pago de Mercado Pago y recibe el webhook. Las llaves solo viven en el PC (backend/.env, excluido de Git).",
+  "scripts": {
+    "solicitud": "node scripts/createTripRequest.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "dotenv": "^18.0.10",
+    "firebase-admin": "^14.5.0"
+  }
+}
