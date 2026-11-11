@@ -3,7 +3,7 @@
 // así que se prueban con Jest.
 // AI-assisted: see docs/AI_LOG.md #11
 import { PRICING } from '../config/pricing';
-import { TRIP_REQUEST, TRIP_STATUS } from '../config/tripRequest';
+import { TRIP_REQUEST, TRIP_STATUS, ACTIVE_TRIP_STATUSES } from '../config/tripRequest';
 
 const PAYMENT_METHOD_LABELS = Object.freeze({
   mercadopago: 'Mercado Pago',
@@ -23,16 +23,15 @@ const isValidPlace = (place) =>
 const isKnownCategory = (category) =>
   typeof category === 'string' && Object.prototype.hasOwnProperty.call(PRICING.categoryMultipliers, category);
 
-// Convierte un documento de trips en el objeto que usa la pantalla, o devuelve
-// null si algo no cuadra. Los datos que llegan de la base de datos NO se usan
-// sin revisarlos: una solicitud mal formada se descarta en vez de romper la app.
+// Revisión común a cualquier viaje: devuelve el objeto que usan las pantallas
+// o null si algo no cuadra. Los datos que llegan de la base de datos NO se usan
+// sin revisarlos: un viaje mal formado se descarta en vez de romper la app.
 // createdAt llega como Timestamp de Firestore; se guarda en milisegundos
 // (número) para poder pasarlo como parámetro de navegación.
-export function parseTripRequest(id, data) {
+function parseTripBase(id, data) {
   const createdAt = data?.createdAt?.toDate?.();
   const isValid =
     typeof id === 'string' &&
-    data?.status === TRIP_STATUS.REQUESTED &&
     createdAt instanceof Date &&
     !Number.isNaN(createdAt.getTime()) &&
     isKnownCategory(data.category) &&
@@ -53,6 +52,22 @@ export function parseTripRequest(id, data) {
     destination: { address: data.destination.address, lat: data.destination.lat, lng: data.destination.lng },
     createdAtMs: createdAt.getTime(),
   };
+}
+
+// Solicitud entrante: solo si está en "requested".
+export function parseTripRequest(id, data) {
+  if (data?.status !== TRIP_STATUS.REQUESTED) return null;
+  return parseTripBase(id, data);
+}
+
+// Viaje activo (aceptado, yendo a recoger o en curso). Además de lo común
+// necesita la ruta del viaje (routePolyline) para dibujarla en el mapa.
+export function parseActiveTrip(id, data) {
+  if (!ACTIVE_TRIP_STATUSES.includes(data?.status)) return null;
+  if (typeof data.routePolyline !== 'string' || data.routePolyline.length === 0) return null;
+  const base = parseTripBase(id, data);
+  if (!base) return null;
+  return { ...base, status: data.status, routePolyline: data.routePolyline };
 }
 
 // Segundos que le quedan al conductor, contados desde createdAt (la misma

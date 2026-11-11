@@ -766,3 +766,46 @@ Ya monté el esqueleto de navegación que revisamos y lo probé en mi iPhone con
   - Una solicitud que nadie responde no debe quedar abierta para siempre: el sistema debe cerrarla.
   - `useRef` sirve para lo que debe cambiar al instante sin volver a dibujar la pantalla (evitar dos respuestas).
   - Lo que se monta debe ser exactamente lo aprobado.
+
+### Entrada #12
+
+- **Fecha:** 11/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramientas:** Claude (Anthropic) para el diseño y el código; Gemini (Google) para la revisión crítica del commit 4.
+- **Objetivo:** Implementar el viaje en curso (enunciado S3, E1, H3, G2, T7): viaje activo compartido con un Context, reglas de Firestore para cada paso del viaje y la pantalla Viaje en curso con rutas en el mapa, "Pasajero a bordo", "Finalizar" con la tarifa final y "Cancelar viaje".
+
+- **Prompt (textual, mensajes principales):**
+  1. "decisiones 1A 2A (aqui tengo una duda, cuando el conductor ya va llegando al destino de dejar al pasajero, hoy en dias las aplicaciones le empiezan a asignar otro viaje) 3A 4A" (ruta hasta el pasajero con una llamada a OSRM; sin escribir la ubicación durante el viaje; guardar la tarifa al finalizar; cancelar antes de que suba el pasajero).
+  2. "no encadenemos viajes es que se complica la cosa proced".
+  3. "aprobado" (ActiveTripContext) y "a" (que el servidor recalcule la tarifa con la misma fórmula).
+  4. "sigamos con el commit 4 y ese le hacemos parrevie en gemini y las dudas por que como dices e sun cambio grande".
+  5. Prompt a Gemini (textual, sin el código): "Actúa como revisor de código CRÍTICO (peer review) de un proyecto académico de Desarrollo Móvil. No reescribas todo: señala problemas concretos con el archivo y la línea, explica por qué son un problema y propone el cambio mínimo. Si algo está bien, dilo. Cuando una afirmación dependa de una versión o de la documentación, cita la documentación oficial (React Navigation 7, Firebase/Firestore Security Rules, Expo SDK 58, react-native-maps). No inventes APIs: si no estás seguro, dilo." + contexto, requisitos del enunciado, las 5 decisiones tomadas y 6 preguntas (usePreventRemove en iOS y el orden con la navegación; carreras entre updateDoc y onSnapshot; expectedFare: entero vs decimal, `let`, mapa literal y `commission * 5 == fare`; limpieza de efectos y AbortController en Expo SDK 58; rendimiento de fitToCoordinates y useMemo; seguridad y manejo de errores), seguido del código completo de los archivos del commit 4, el Context, polyline, calculateFare, pricing y el bloque de reglas de `trips`.
+  6. "aprobado" (cambios después de la revisión de Gemini).
+
+- **Resumen:** Claude propuso dividir la rama en 4 commits: decodificador de rutas, viaje activo con Context, reglas de cada transición del viaje con la tarifa recalculada en el servidor, y la pantalla Viaje en curso. Gemini revisó el commit 4. De sus 6 puntos, 3 se aceptaron, 2 se descartaron por estar equivocados y 1 tenía razón en el riesgo pero proponía un arreglo que no lo resolvía. Al revisar su respuesta se encontró un problema que Gemini no vio: la pantalla salía antes de que el servidor confirmara Finalizar.
+
+- **Qué se usó / modificó / descartó:**
+  - **Se usó:** `decodePolyline` propio (sin librerías) con 4 pruebas.
+  - **Se usó:** `ActiveTripContext` (H3): si la app se cierra a mitad del viaje, vuelve sola a Viaje en curso; mientras haya viaje activo, Inicio no se pone Disponible ni escucha solicitudes.
+  - **Se usó:** reglas por transición: `accepted → driver_arriving → in_progress → completed` y `cancelled` solo antes de `in_progress`, cada paso con sus campos exactos (`diff().affectedKeys().hasOnly`). Al finalizar, el servidor recalcula la tarifa (`expectedFare()`) y valida comisión 20 %, propina 0 y ganancia.
+  - **Se usó:** pantalla con la ruta hasta el pasajero (una sola llamada a OSRM, con `AbortController`) y la ruta del viaje (`Polyline`), `usePreventRemove` y sin gesto ni botón de atrás; la tarifa final se calcula con `calculateFare` (`buildCompletionData`, 4 pruebas).
+  - **Se usó (de Gemini):** la confirmación de que `AbortController`, la limpieza con `isCancelled` y los `useMemo` estaban bien.
+  - **Se modificó (de Gemini, con otro arreglo):** el paso automático a `driver_arriving` podía enviarse dos veces; Gemini propuso `isMounted`, que no evita la segunda escritura; se usó un `useRef` con el id del viaje.
+  - **Se modificó (encontrado al revisar a Gemini):** Firestore aplica la escritura en el celular antes de que el servidor responda; la pantalla ahora espera la confirmación del servidor antes de salir. Si las reglas rechazan, el viaje vuelve y se muestra el error.
+  - **Se descartó (Gemini):** navegar justo después del `await` en Finalizar: `usePreventRemove` bloquearía ese `replace` mientras el viaje siga activo.
+  - **Se descartó (Gemini):** que el mapa literal `{...}[categoría]` sea un error de sintaxis y que la comparación entero/decimal falle: las reglas se publicaron sin error, la referencia oficial documenta el operador `x[k]` y `math.round` devuelve un entero; la prueba real lo confirmó.
+  - **Se descartó:** encadenar viajes (asignar otro viaje antes de terminar): no lo pide el enunciado y complica reglas, script y pantallas.
+
+- **Archivos y commits:** `src/utils/polyline.js` y su prueba — `ebabbe9`; `src/context/ActiveTripContext.js`, `src/hooks/useActiveTrip.js`, `src/config/tripRequest.js`, `src/utils/tripRequestData.js` y su prueba, `src/services/tripService.js`, `src/navigation/MainDrawer.js`, `src/screens/main/HomeScreen.js` — `9605210`; `firestore.rules`, `src/config/pricing.js` — `d0a4c95`; `src/screens/main/TripInProgressScreen.js`, `src/services/routeService.js`, `src/config/routes.js`, `src/utils/tripCompletion.js` y su prueba, `src/services/tripService.js`, `src/navigation/TripStack.js` — `22d3017`.
+
+- **Verificación:**
+  - `npm test`: 77 pruebas pasando (13 nuevas en la rama).
+  - Área de prueba de reglas: `accepted → driver_arriving` y `driver_arriving → in_progress` permitidos; `accepted → completed`, `accepted → in_progress` e `in_progress → cancelled` denegados (capturas 71–75).
+  - iPhone (Expo Go, prueba2), todas bien: (1) ruta hasta el pasajero y `driver_arriving`; (2) "Pasajero a bordo" cambia a la ruta del viaje e `in_progress`; (3) al cerrar y abrir Expo Go vuelve a la misma etapa; (4) "Finalizar" guarda `fare` 18800, `commission` 3760, `driverEarnings` 15040, `tip` 0, `commissionRate` 0.2 y `completedAt` (9,6 km, 15 min, económico; la regla `expectedFare()` lo aceptó); (5) "Cancelar viaje" deja `cancelled` con `cancelledAt` y vuelve a Inicio (capturas 63–70).
+  - Contexto de viaje activo: al reabrir la app con un viaje aceptado vuelve a Viaje en curso; al pasarlo a `completed` en la consola, Inicio queda libre.
+
+- **Aprendizaje:**
+  - Un revisor de IA también se equivoca: sus afirmaciones se comprueban contra la documentación oficial y con una prueba real.
+  - Firestore muestra los cambios en el celular antes de que el servidor los acepte; una acción importante debe esperar la confirmación.
+  - Un arreglo puede sonar bien y no resolver el problema (`isMounted` no evita una segunda escritura).
+  - La tarifa que el cliente envía se valida en el servidor con la misma fórmula, no se confía en el celular.
