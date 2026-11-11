@@ -74,8 +74,10 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 
 - [x] Arquitectura por capas
 - [x] Cálculo de tarifa, comisión y ganancia neta (`src/utils/calculateFare.js`) con pruebas
-- [ ] Registro del conductor (datos personales, vehículo y documentos)
-- [ ] Disponibilidad y ubicación en tiempo real
+- [x] Inicio de sesión y creación de cuenta (Firebase Auth) con sesión en tiempo real según el estado del conductor
+- [x] Registro del conductor (datos personales, vehículo, documentos y fotos) guardado en Firestore con estado pendiente
+- [x] Reglas de seguridad de Firestore que validan el registro y la ubicación
+- [x] Disponibilidad y ubicación en tiempo real
 - [ ] Solicitudes con tiempo límite
 - [ ] Navegación al punto de recogida y al destino
 - [ ] Cobro con Mercado Pago y en efectivo
