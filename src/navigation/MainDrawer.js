@@ -1,6 +1,8 @@
 // src/navigation/MainDrawer.js
 // Drawer del conductor aprobado (enunciado F8): Inicio (con el TripStack),
 // Historial, Ganancias y Perfil, y al final "Cerrar sesión".
+// ActiveTripProvider envuelve el menú: el viaje activo solo existe para el
+// conductor aprobado y cualquier pantalla del menú puede leerlo.
 // AI-assisted: see docs/AI_LOG.md #3
 import React from 'react';
 import {
@@ -15,6 +17,7 @@ import PlaceholderScreen from '../components/PlaceholderScreen';
 import { signOut } from '../services/authService';
 import { saveDriverLocation } from '../services/locationService';
 import useSession from '../hooks/useSession';
+import { ActiveTripProvider } from '../context/ActiveTripContext';
 
 const Drawer = createDrawerNavigator();
 
@@ -60,11 +63,13 @@ function DrawerContent(props) {
 
 export default function MainDrawer() {
   return (
-    <Drawer.Navigator drawerContent={(props) => <DrawerContent {...props} />}>
-      <Drawer.Screen name="Start" component={TripStack} options={startOptions} />
-      <Drawer.Screen name="History" component={PlaceholderScreen} options={{ title: 'Historial' }} />
-      <Drawer.Screen name="Earnings" component={PlaceholderScreen} options={{ title: 'Ganancias' }} />
-      <Drawer.Screen name="Profile" component={PlaceholderScreen} options={{ title: 'Perfil y configuración' }} />
-    </Drawer.Navigator>
+    <ActiveTripProvider>
+      <Drawer.Navigator drawerContent={(props) => <DrawerContent {...props} />}>
+        <Drawer.Screen name="Start" component={TripStack} options={startOptions} />
+        <Drawer.Screen name="History" component={PlaceholderScreen} options={{ title: 'Historial' }} />
+        <Drawer.Screen name="Earnings" component={PlaceholderScreen} options={{ title: 'Ganancias' }} />
+        <Drawer.Screen name="Profile" component={PlaceholderScreen} options={{ title: 'Perfil y configuración' }} />
+      </Drawer.Navigator>
+    </ActiveTripProvider>
   );
 }

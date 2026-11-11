@@ -1,5 +1,5 @@
 // src/utils/__tests__/tripRequestData.test.js
-import { parseTripRequest, getSecondsLeft, formatCop, paymentMethodLabel } from '../tripRequestData';
+import { parseTripRequest, parseActiveTrip, getSecondsLeft, formatCop, paymentMethodLabel } from '../tripRequestData';
 
 const CREATED_AT = new Date(2026, 10, 11, 0, 30, 0);
 
@@ -54,6 +54,35 @@ describe('parseTripRequest', () => {
 
   test('estado distinto de requested: se descarta', () => {
     expect(parseTripRequest('trip-1', validData({ status: 'accepted' }))).toBeNull();
+  });
+});
+
+describe('parseActiveTrip', () => {
+  test('viaje aceptado válido: incluye status y routePolyline', () => {
+    const trip = parseActiveTrip('trip-1', validData({ status: 'accepted' }));
+    expect(trip.status).toBe('accepted');
+    expect(trip.routePolyline).toBe('abc');
+    expect(trip.distanceKm).toBe(8.5);
+  });
+
+  test('yendo a recoger y en curso también son activos', () => {
+    expect(parseActiveTrip('trip-1', validData({ status: 'driver_arriving' }))).not.toBeNull();
+    expect(parseActiveTrip('trip-1', validData({ status: 'in_progress' }))).not.toBeNull();
+  });
+
+  test('requested, rejected, completed o cancelled NO son activos', () => {
+    ['requested', 'rejected', 'completed', 'cancelled'].forEach((status) => {
+      expect(parseActiveTrip('trip-1', validData({ status }))).toBeNull();
+    });
+  });
+
+  test('sin ruta para dibujar: se descarta', () => {
+    expect(parseActiveTrip('trip-1', validData({ status: 'accepted', routePolyline: '' }))).toBeNull();
+    expect(parseActiveTrip('trip-1', validData({ status: 'accepted', routePolyline: undefined }))).toBeNull();
+  });
+
+  test('con datos inválidos (distancia 0): se descarta', () => {
+    expect(parseActiveTrip('trip-1', validData({ status: 'accepted', distanceKm: 0 }))).toBeNull();
   });
 });
 

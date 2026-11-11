@@ -7,10 +7,21 @@ export const TRIP_REQUEST = Object.freeze({
   responseTimeoutSec: 15,
 });
 
-// Estados del viaje que usa esta etapa (enunciado E1/E2). Los demás
-// (driver_arriving, in_progress...) se agregan en la rama del viaje.
+// Estados del viaje (enunciado E1/E2). "paid" se agrega en la rama de pagos.
 export const TRIP_STATUS = Object.freeze({
   REQUESTED: 'requested',
   ACCEPTED: 'accepted',
   REJECTED: 'rejected',
+  DRIVER_ARRIVING: 'driver_arriving',
+  IN_PROGRESS: 'in_progress',
+  COMPLETED: 'completed',
+  CANCELLED: 'cancelled',
 });
+
+// Un viaje en alguno de estos estados es el "viaje activo" del conductor:
+// mientras exista, la app muestra la pantalla Viaje en curso.
+export const ACTIVE_TRIP_STATUSES = Object.freeze([
+  TRIP_STATUS.ACCEPTED,
+  TRIP_STATUS.DRIVER_ARRIVING,
+  TRIP_STATUS.IN_PROGRESS,
+]);
