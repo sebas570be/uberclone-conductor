@@ -4,6 +4,8 @@
 // errores de decimales como 0.1 + 0.2 = 0.30000000000000004.
 // Cambiar un valor aquí cambia la estimación Y el cobro final, porque ambos
 // usan calculateFare (src/utils/calculateFare.js).
+// OJO: firestore.rules repite estos valores en expectedFare() para recalcular
+// la tarifa en el servidor al finalizar el viaje; si cambian aquí, cambiarlos allá.
 // AI-assisted: see docs/AI_LOG.md #1
 
 export const PRICING = Object.freeze({

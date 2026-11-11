@@ -173,9 +173,10 @@ service cloud.firestore {
     }
 
     // Viajes: trips/{tripId}. Los CREA solo el backend (firebase-admin, que se
-    // salta estas reglas). La app del conductor solo lee los suyos y responde.
-    // Los estados siguientes (driver_arriving, in_progress...) se abren en la
-    // rama del viaje, cuando exista la pantalla que los usa.
+    // salta estas reglas). La app del conductor solo lee los suyos y los hace
+    // avanzar un paso a la vez (enunciado E1):
+    //   requested → accepted / rejected → driver_arriving → in_progress → completed
+    //   accepted / driver_arriving → cancelled (nunca después de in_progress)
     match /trips/{tripId} {
 
       // El viaje es de este conductor (vale para leer uno y para consultas:
@@ -189,24 +190,65 @@ service cloud.firestore {
         return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
       }
 
+      // Paso de un estado a otro.
+      function isTransition(fromStatus, toStatus) {
+        return resource.data.status == fromStatus && request.resource.data.status == toStatus;
+      }
+
       // Tiempo para aceptar, verificado en el servidor (el temporizador del
       // celular se puede pausar o manipular): 15 s + 5 s de margen por la red.
       function isWithinResponseWindow() {
         return request.time <= resource.data.createdAt + duration.value(20, 's');
       }
 
+      // Tarifa recalculada en el servidor con la MISMA fórmula de calculateFare,
+      // usando datos que el conductor no puede cambiar (distancia, duración y
+      // categoría). Así no se puede cobrar de más modificando la app.
+      // OJO: repite los valores de src/config/pricing.js; si cambian allá,
+      // hay que cambiarlos aquí.
+      function expectedFare() {
+        let trip = resource.data;
+        let multiplier = {'economy': 1.0, 'xl': 1.4, 'premium': 1.8}[trip.category];
+        let rawFare = (3500 + trip.distanceKm * 1200 + trip.durationMin * 250) * multiplier;
+        return rawFare < 6000 ? 6000 : math.round(rawFare / 100) * 100;
+      }
+
+      // Finalizar: hora del servidor y cobro coherente con la fórmula
+      // (comisión 20 %, sin propina por ahora, ganancia = tarifa - comisión).
+      function isValidCompletion() {
+        let trip = request.resource.data;
+        return onlyChanges(['status', 'completedAt', 'fare', 'commission', 'tip', 'driverEarnings', 'commissionRate'])
+            && trip.completedAt == request.time
+            && trip.fare == expectedFare()
+            && trip.commissionRate == 0.2
+            && trip.commission * 5 == trip.fare
+            && trip.tip == 0
+            && trip.driverEarnings == trip.fare - trip.commission;
+      }
+
       allow read: if isAssignedDriver();
 
-      // Responder la solicitud: solo desde "requested", solo cambia status y la
-      // hora de respuesta (del servidor, como createdAt), y aceptar solo dentro
-      // del tiempo. Rechazar se permite siempre (incluye el rechazo automático
-      // del temporizador al llegar a 0).
-      allow update: if isAssignedDriver()
-                    && resource.data.status == 'requested'
-                    && onlyChanges(['status', 'respondedAt'])
-                    && request.resource.data.respondedAt == request.time
-                    && ((request.resource.data.status == 'accepted' && isWithinResponseWindow())
-                        || request.resource.data.status == 'rejected');
+      allow update: if isAssignedDriver() && (
+        // Responder la solicitud: solo cambia status y la hora de respuesta;
+        // aceptar solo dentro del tiempo, rechazar siempre (incluye el rechazo
+        // automático del temporizador al llegar a 0).
+        (resource.data.status == 'requested'
+          && onlyChanges(['status', 'respondedAt'])
+          && request.resource.data.respondedAt == request.time
+          && ((request.resource.data.status == 'accepted' && isWithinResponseWindow())
+              || request.resource.data.status == 'rejected'))
+        // Va a recoger (al abrir la pantalla del viaje).
+        || (isTransition('accepted', 'driver_arriving') && onlyChanges(['status']))
+        // "Pasajero a bordo".
+        || (isTransition('driver_arriving', 'in_progress') && onlyChanges(['status']))
+        // "Cancelar viaje": solo antes de que el pasajero suba.
+        || (resource.data.status in ['accepted', 'driver_arriving']
+            && request.resource.data.status == 'cancelled'
+            && onlyChanges(['status', 'cancelledAt'])
+            && request.resource.data.cancelledAt == request.time)
+        // "Finalizar".
+        || (isTransition('in_progress', 'completed') && isValidCompletion())
+      );
 
       // Crear y borrar: nunca desde la app (solo el backend).
       allow create, delete: if false;
