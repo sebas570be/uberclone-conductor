@@ -28,16 +28,23 @@ export default function DateField({
     onClose?.();
   };
 
-  const handleChange = (event, selectedDate) => {
+  // datetimepicker 9: onChange quedó obsoleto. Ahora hay dos eventos:
+  // onValueChange (eligió una fecha) y onDismiss (cerró el diálogo sin elegir).
+  const handleValueChange = (event, selectedDate) => {
     if (Platform.OS === 'android') {
       // En Android hay que cerrarlo primero; si no, el diálogo vuelve a abrirse.
       setIsOpen(false);
-      if (event.type === 'set' && selectedDate) onChange(selectedDate);
+      if (selectedDate) onChange(selectedDate);
       onClose?.();
       return;
     }
     // iOS: cada giro de la rueda llega aquí.
     if (selectedDate) onChange(selectedDate);
+  };
+
+  // Android: tocó "Cancelar" en el diálogo.
+  const handleDismiss = () => {
+    close();
   };
 
   // iOS: si toca "Listo" sin girar la rueda, acepta la fecha que estaba viendo.
@@ -65,7 +72,8 @@ export default function DateField({
             value={shownDate}
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-            onChange={handleChange}
+            onValueChange={handleValueChange}
+            onDismiss={handleDismiss}
             minimumDate={minimumDate}
             maximumDate={maximumDate}
             locale="es-CO" // solo iOS: nombres de los meses en español

@@ -142,10 +142,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#FFFFFF',
   },
+  // Contenido arriba (no centrado): si estuviera centrado, al abrirse el
+  // teclado los campos quedaban tapados, porque automaticallyAdjustKeyboardInsets
+  // solo agranda el área de scroll, no mueve el diseño.
   container: {
     flexGrow: 1,
-    justifyContent: 'center',
     padding: 24,
+    paddingTop: 72,
   },
   title: {
     fontSize: 26,
