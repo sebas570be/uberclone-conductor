@@ -1,12 +1,13 @@
 // src/navigation/TripStack.js
 // Stack del viaje (enunciado §3): Inicio → Solicitud → Viaje en curso → Cobro.
-// Inicio y Solicitud ya son pantallas reales; las demás siguen provisionales.
+// Inicio, Solicitud y Viaje en curso ya son pantallas reales; el Cobro sigue provisional.
 // AI-assisted: see docs/AI_LOG.md #3 (esqueleto) y #11 (Solicitud)
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import PlaceholderScreen from '../components/PlaceholderScreen';
 import HomeScreen from '../screens/main/HomeScreen';
 import TripRequestScreen from '../screens/main/TripRequestScreen';
+import TripInProgressScreen from '../screens/main/TripInProgressScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -22,11 +23,12 @@ export default function TripStack() {
         component={TripRequestScreen}
         options={{ title: 'Nueva solicitud', headerBackVisible: false, gestureEnabled: false }}
       />
+      {/* Viaje en curso: sin botón ni gesto de "atrás"; además usePreventRemove
+          bloquea cualquier otra forma de salir mientras el viaje esté activo. */}
       <Stack.Screen
         name="TripInProgress"
-        component={PlaceholderScreen}
-        options={{ title: 'Viaje en curso' }}
-        initialParams={{ next: 'TripSummary' }}
+        component={TripInProgressScreen}
+        options={{ title: 'Viaje en curso', headerBackVisible: false, gestureEnabled: false }}
       />
       <Stack.Screen name="TripSummary" component={PlaceholderScreen} options={{ title: 'Cobro y resumen' }} />
     </Stack.Navigator>
