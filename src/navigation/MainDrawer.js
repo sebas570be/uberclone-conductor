@@ -13,6 +13,8 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import TripStack from './TripStack';
 import PlaceholderScreen from '../components/PlaceholderScreen';
 import { signOut } from '../services/authService';
+import { saveDriverLocation } from '../services/locationService';
+import useSession from '../hooks/useSession';
 
 const Drawer = createDrawerNavigator();
 
@@ -29,15 +31,27 @@ function startOptions({ route }) {
 // "Cerrar sesión". No hace falta navegar al login: al cerrar sesión, el
 // SessionContext detecta que no hay usuario y RootNavigator cambia solo.
 function DrawerContent(props) {
+  const { user } = useSession();
+
+  // Primero se marca "No disponible" (todavía con sesión, así las reglas lo
+  // permiten) y DESPUÉS se cierra sesión. Si fuera al revés, la escritura
+  // fallaría y el conductor quedaría como disponible en la base de datos.
+  const handleSignOut = async () => {
+    if (user?.uid) {
+      await saveDriverLocation(user.uid, false, null).catch((error) =>
+        console.log('No se pudo marcar No disponible:', error?.code)
+      );
+    }
+    signOut().catch((error) => console.log('Error al cerrar sesión:', error.code));
+  };
+
   return (
     <DrawerContentScrollView {...props}>
       <DrawerItemList {...props} />
       <DrawerItem
         label="Cerrar sesión"
         labelStyle={{ color: '#DC2626' }}
-        onPress={() => {
-          signOut().catch((error) => console.log('Error al cerrar sesión:', error.code));
-        }}
+        onPress={handleSignOut}
         accessibilityRole="button"
       />
     </DrawerContentScrollView>

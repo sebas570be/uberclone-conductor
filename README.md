@@ -60,6 +60,16 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 
 **Riesgo aceptado:** las fotos de los documentos quedan en una URL pública. Es larga y aleatoria, imposible de adivinar, pero quien la tenga puede verla. Las URL solo se guardan en el documento del conductor, que las reglas de Firestore dejan leer únicamente al propio conductor. Mejora prevista: servirlas con URL privadas firmadas desde el backend.
 
+## Ubicación en tiempo real
+
+- **Librería:** `expo-location` (`watchPositionAsync`). El enunciado nombra `@react-native-community/geolocation`, pero es un módulo nativo que no funciona en Expo Go. `expo-location` es el módulo Expo equivalente, que es la herramienta del curso ("un módulo Expo seleccionado" para la ubicación, semanas 4 y 12 del microcurrículo), y funciona en Expo Go y en la APK.
+- **Frecuencia:** el GPS avisa cada 20 m y la ubicación se escribe en Firestore cada 5 s mientras el conductor está Disponible y en la pantalla Inicio. En iOS `timeInterval` no tiene efecto; por eso el envío usa un intervalo propio.
+- **Dónde se guarda:** colección aparte `driverLocations/{uid}` = `{ isAvailable, location, updatedAt }`. El registro (`drivers/{uid}`) no se reescribe cada 5 s, y quien necesite la ubicación no lee datos personales. Al pasar a No disponible, la ubicación se guarda en `null`.
+- **Reglas:** solo el dueño lee y escribe; ponerse Disponible exige `status == 'approved'` en su registro (verificado en el servidor con `get()`).
+- **Desconexión:** al cerrar sesión desde el menú, primero se marca No disponible y después se cierra la sesión. Si la app se cierra de golpe estando Disponible, el documento puede quedar con `isAvailable: true`; por eso una ubicación con `updatedAt` de más de 30 s se considera desconectada.
+- **Segundo plano:** con la app minimizada, iOS pausa los temporizadores de JavaScript y el envío se detiene hasta volver a abrirla. Enviar en segundo plano exige tareas en segundo plano y permiso "Siempre", que quedan fuera de Expo Go.
+- **Último estado del interruptor:** se guarda en AsyncStorage (`@uberclone_conductor:isAvailable:<uid>`), porque es una preferencia y no un dato sensible.
+
 ## Estado del desarrollo
 
 - [x] Arquitectura por capas
