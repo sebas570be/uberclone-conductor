@@ -3,15 +3,30 @@
 // Único lugar de la app que usa expo-image-picker y la API de Cloudinary.
 import * as ImagePicker from 'expo-image-picker';
 import { File } from 'expo-file-system';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { CLOUDINARY } from '../config/cloudinary';
 
 const PICKER_OPTIONS = {
   mediaTypes: ['images'],
-  quality: 0.6, // comprime la foto: sube más rápido y gasta menos datos
+  quality: 1, // sin comprimir aquí: se reduce y comprime una sola vez en reducePhoto
   // iOS: entrega JPEG aunque la foto de la galería esté en HEIC (Cloudinary
   // solo acepta jpg/png en nuestro preset). En Android no tiene efecto.
   preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
 };
+
+// Tamaño máximo del lado mayor de la foto. Con 1280 px se sigue leyendo la
+// placa y los documentos, y cada foto pesa unos cientos de KB, no 1,3 MB.
+const MAX_PHOTO_SIZE = 1280;
+
+// Reduce la foto (sin deformarla) y la guarda como JPEG comprimido.
+// maxWidth/maxHeight reducen la imagen al cargarla: la foto completa de la
+// cámara nunca se carga en memoria. Si ya es más pequeña, no se agranda.
+async function reducePhoto(uri) {
+  const context = ImageManipulator.manipulate(uri, { maxWidth: MAX_PHOTO_SIZE, maxHeight: MAX_PHOTO_SIZE });
+  const image = await context.renderAsync();
+  const result = await image.saveAsync({ compress: 0.7, format: SaveFormat.JPEG });
+  return result.uri;
+}
 
 // Pide el permiso y abre la cámara o la galería.
 // Devuelve { status: 'ok', uri } | { status: 'canceled' } | { status: 'denied' }.
@@ -31,7 +46,7 @@ export async function pickPhoto(source) {
   if (result.canceled) {
     return { status: 'canceled' };
   }
-  return { status: 'ok', uri: result.assets[0].uri };
+  return { status: 'ok', uri: await reducePhoto(result.assets[0].uri) };
 }
 
 // Sube una foto (uri local del celular) y devuelve su URL https de Cloudinary.
