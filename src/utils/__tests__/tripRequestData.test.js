@@ -1,5 +1,13 @@
 // src/utils/__tests__/tripRequestData.test.js
-import { parseTripRequest, parseActiveTrip, getSecondsLeft, formatCop, paymentMethodLabel } from '../tripRequestData';
+import {
+  parseTripRequest,
+  parseActiveTrip,
+  parseTripSummary,
+  getSecondsLeft,
+  formatCop,
+  paymentMethodLabel,
+  paymentStatusLabel,
+} from '../tripRequestData';
 
 const CREATED_AT = new Date(2026, 10, 11, 0, 30, 0);
 
@@ -86,6 +94,55 @@ describe('parseActiveTrip', () => {
   });
 });
 
+describe('parseTripSummary', () => {
+  // Viaje finalizado con el cobro que guarda "Finalizar" (9.6 km, 15 min, economy).
+  const completedData = (overrides = {}) =>
+    validData({
+      status: 'completed',
+      fare: 18800,
+      commission: 3760,
+      driverEarnings: 15040,
+      commissionRate: 0.2,
+      tip: 0,
+      ...overrides,
+    });
+
+  test('finalizado sin cobrar: incluye el cobro y paymentStatus null', () => {
+    expect(parseTripSummary('trip-1', completedData())).toMatchObject({
+      id: 'trip-1',
+      status: 'completed',
+      fare: 18800,
+      commission: 3760,
+      driverEarnings: 15040,
+      commissionRate: 0.2,
+      paymentStatus: null,
+    });
+  });
+
+  test('pagado en efectivo: status paid y paymentStatus cash', () => {
+    const trip = parseTripSummary('trip-1', completedData({ status: 'paid', paymentStatus: 'cash' }));
+    expect(trip.status).toBe('paid');
+    expect(trip.paymentStatus).toBe('cash');
+  });
+
+  test('estados que no son de un viaje terminado: se descarta', () => {
+    ['requested', 'accepted', 'in_progress', 'cancelled'].forEach((status) => {
+      expect(parseTripSummary('trip-1', completedData({ status }))).toBeNull();
+    });
+  });
+
+  test('cobro incoherente, con decimales o en 0: se descarta', () => {
+    expect(parseTripSummary('trip-1', completedData({ driverEarnings: 99999 }))).toBeNull();
+    expect(parseTripSummary('trip-1', completedData({ fare: 18800.5 }))).toBeNull();
+    expect(parseTripSummary('trip-1', completedData({ fare: 0, commission: 0, driverEarnings: 0 }))).toBeNull();
+    expect(parseTripSummary('trip-1', completedData({ fare: undefined }))).toBeNull();
+  });
+
+  test('paymentStatus desconocido: se trata como sin estado', () => {
+    expect(parseTripSummary('trip-1', completedData({ paymentStatus: 'inventado' })).paymentStatus).toBeNull();
+  });
+});
+
 describe('getSecondsLeft', () => {
   const start = CREATED_AT.getTime();
 
@@ -129,5 +186,19 @@ describe('paymentMethodLabel', () => {
     expect(paymentMethodLabel('cash')).toBe('Efectivo');
     expect(paymentMethodLabel('mercadopago')).toBe('Mercado Pago');
     expect(paymentMethodLabel('otro')).toBe('');
+  });
+});
+
+describe('paymentStatusLabel', () => {
+  test('texto del estado del cobro (S4)', () => {
+    expect(paymentStatusLabel('approved')).toBe('Aprobado');
+    expect(paymentStatusLabel('pending')).toBe('Pendiente');
+    expect(paymentStatusLabel('rejected')).toBe('Rechazado');
+    expect(paymentStatusLabel('cash')).toBe('Efectivo');
+  });
+
+  test('sin estado todavía: Pendiente', () => {
+    expect(paymentStatusLabel(null)).toBe('Pendiente');
+    expect(paymentStatusLabel(undefined)).toBe('Pendiente');
   });
 });

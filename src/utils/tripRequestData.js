@@ -11,6 +11,14 @@ const PAYMENT_METHOD_LABELS = Object.freeze({
   cash: 'Efectivo',
 });
 
+// Texto que ve el conductor para el estado del cobro (enunciado S4).
+const PAYMENT_STATUS_LABELS = Object.freeze({
+  approved: 'Aprobado',
+  pending: 'Pendiente',
+  rejected: 'Rechazado',
+  cash: 'Efectivo',
+});
+
 const isPositiveNumber = (value) => typeof value === 'number' && Number.isFinite(value) && value > 0;
 
 const isValidPlace = (place) =>
@@ -70,6 +78,36 @@ export function parseActiveTrip(id, data) {
   return { ...base, status: data.status, routePolyline: data.routePolyline };
 }
 
+// Viaje terminado, para la pantalla de cobro y resumen (S4): finalizado (por
+// cobrar) o ya pagado. Además de lo común necesita el cobro que guardó
+// "Finalizar": tarifa, comisión y ganancia en pesos enteros y coherentes.
+// Un paymentStatus desconocido se trata como "todavía sin estado" (null).
+export function parseTripSummary(id, data) {
+  if (data?.status !== TRIP_STATUS.COMPLETED && data?.status !== TRIP_STATUS.PAID) return null;
+  const { fare, commission, driverEarnings, commissionRate } = data;
+  const isValidCharge =
+    Number.isInteger(fare) &&
+    fare > 0 &&
+    Number.isInteger(commission) &&
+    commission >= 0 &&
+    driverEarnings === fare - commission;
+  if (!isValidCharge) return null;
+  const base = parseTripBase(id, data);
+  if (!base) return null;
+
+  return {
+    ...base,
+    status: data.status,
+    fare,
+    commission,
+    driverEarnings,
+    commissionRate: typeof commissionRate === 'number' && commissionRate >= 0 && commissionRate <= 1 ? commissionRate : null,
+    paymentStatus: Object.prototype.hasOwnProperty.call(PAYMENT_STATUS_LABELS, data.paymentStatus)
+      ? data.paymentStatus
+      : null,
+  };
+}
+
 // Segundos que le quedan al conductor, contados desde createdAt (la misma
 // referencia que usan las reglas). Nunca menos de 0 ni más del límite (si el
 // reloj del celular va un poco atrasado, no se muestran 17 s).
@@ -91,4 +129,9 @@ export function formatCop(value) {
 // Texto que ve el conductor para el método de pago ('cash' → 'Efectivo').
 export function paymentMethodLabel(paymentMethod) {
   return PAYMENT_METHOD_LABELS[paymentMethod] ?? '';
+}
+
+// Texto del estado del cobro ('cash' → 'Efectivo'). Sin estado todavía: 'Pendiente'.
+export function paymentStatusLabel(paymentStatus) {
+  return PAYMENT_STATUS_LABELS[paymentStatus] ?? 'Pendiente';
 }

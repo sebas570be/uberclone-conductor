@@ -7,7 +7,8 @@ export const TRIP_REQUEST = Object.freeze({
   responseTimeoutSec: 15,
 });
 
-// Estados del viaje (enunciado E1/E2). "paid" se agrega en la rama de pagos.
+// Estados del viaje (enunciado E1/E2). "paid" = ya cobrado (en efectivo o
+// por Mercado Pago).
 export const TRIP_STATUS = Object.freeze({
   REQUESTED: 'requested',
   ACCEPTED: 'accepted',
@@ -16,6 +17,16 @@ export const TRIP_STATUS = Object.freeze({
   IN_PROGRESS: 'in_progress',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
+  PAID: 'paid',
+});
+
+// Estado del cobro que se guarda en el viaje (paymentStatus, enunciado S4).
+// Lo escribe el botón "Recibí el efectivo" o el backend (Mercado Pago).
+export const PAYMENT_STATUS = Object.freeze({
+  APPROVED: 'approved',
+  PENDING: 'pending',
+  REJECTED: 'rejected',
+  CASH: 'cash',
 });
 
 // Un viaje en alguno de estos estados es el "viaje activo" del conductor:

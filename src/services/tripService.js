@@ -4,7 +4,7 @@
 // AI-assisted: see docs/AI_LOG.md #11
 import { collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { TRIP_STATUS, ACTIVE_TRIP_STATUSES } from '../config/tripRequest';
+import { TRIP_STATUS, ACTIVE_TRIP_STATUSES, PAYMENT_STATUS } from '../config/tripRequest';
 import { buildCompletionData } from '../utils/tripCompletion';
 
 // Escucha en tiempo real las solicitudes "requested" de este conductor.
@@ -39,6 +39,17 @@ export function subscribeToActiveTrips(uid, onTrips, onError) {
   );
 }
 
+// Escucha en tiempo real UN viaje (pantalla de cobro y resumen): así se ve el
+// cambio cuando se cobra, desde esta app o desde el backend (Mercado Pago).
+// Devuelve null si el viaje no existe.
+export function subscribeToTrip(tripId, onTrip, onError) {
+  return onSnapshot(
+    doc(db, 'trips', tripId),
+    (snapshot) => onTrip(snapshot.exists() ? { id: snapshot.id, data: snapshot.data() } : null),
+    onError
+  );
+}
+
 // Aceptar o rechazar. Solo se envían status y respondedAt (las reglas no
 // permiten cambiar nada más), con la hora del servidor.
 export async function respondToTrip(tripId, status) {
@@ -68,6 +79,16 @@ export async function completeTrip(trip) {
   await updateDoc(doc(db, 'trips', trip.id), {
     ...buildCompletionData(trip),
     completedAt: serverTimestamp(),
+  });
+}
+
+// "Recibí el efectivo": el viaje queda pagado, con la hora del servidor. Las
+// reglas solo lo permiten en viajes en efectivo ya finalizados.
+export async function collectCash(tripId) {
+  await updateDoc(doc(db, 'trips', tripId), {
+    status: TRIP_STATUS.PAID,
+    paymentStatus: PAYMENT_STATUS.CASH,
+    paidAt: serverTimestamp(),
   });
 }
 
