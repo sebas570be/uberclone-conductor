@@ -11,6 +11,17 @@ require('dotenv').config({ path: path.join(__dirname, '..', '.env'), quiet: true
 const CONFIG = Object.freeze({
   serviceAccountPath: process.env.FIREBASE_SERVICE_ACCOUNT_PATH,
 
+  // Servidor de pagos (Express). 0.0.0.0 = acepta conexiones de la red local
+  // (el iPhone en el mismo Wi-Fi), no solo del propio PC.
+  port: Number(process.env.PORT) || 3000,
+  host: '0.0.0.0',
+
+  // Mercado Pago: el Access Token es SECRETO (solo en backend/.env, nunca en
+  // la app ni en Git). Es el de la cuenta VENDEDOR DE PRUEBA (APP_USR-...).
+  mercadoPagoAccessToken: process.env.MP_ACCESS_TOKEN,
+  mercadoPagoBaseUrl: 'https://api.mercadopago.com',
+  currency: 'COP',
+
   // APIs públicas y gratuitas (sin llave): las permite el enunciado (§7).
   osrmBaseUrl: 'https://router.project-osrm.org',
   nominatimBaseUrl: 'https://nominatim.openstreetmap.org',
