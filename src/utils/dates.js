@@ -13,3 +13,10 @@ export function formatDate(date) {
 export function yearsAgo(years, today = new Date()) {
   return new Date(today.getFullYear() - years, today.getMonth(), today.getDate());
 }
+
+// Fecha y hora de un viaje en el historial: "12/11/2026 19:05" (24 horas).
+export function formatDateTime(date) {
+  const hours = String(date.getHours()).padStart(2, '0');
+  const minutes = String(date.getMinutes()).padStart(2, '0');
+  return `${formatDate(date)} ${hours}:${minutes}`;
+}
