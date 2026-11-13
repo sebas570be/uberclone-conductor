@@ -3,6 +3,7 @@ import {
   parseTripRequest,
   parseActiveTrip,
   parseTripSummary,
+  parseFinishedTrip,
   getSecondsLeft,
   formatCop,
   paymentMethodLabel,
@@ -140,6 +141,47 @@ describe('parseTripSummary', () => {
 
   test('paymentStatus desconocido: se trata como sin estado', () => {
     expect(parseTripSummary('trip-1', completedData({ paymentStatus: 'inventado' })).paymentStatus).toBeNull();
+  });
+});
+
+describe('parseFinishedTrip', () => {
+  const COMPLETED_AT = new Date(2026, 10, 12, 19, 5, 0);
+  const finishedData = (overrides = {}) =>
+    validData({
+      status: 'paid',
+      paymentStatus: 'approved',
+      fare: 14700,
+      commission: 2940,
+      driverEarnings: 11760,
+      commissionRate: 0.2,
+      tip: 0,
+      completedAt: { toDate: () => COMPLETED_AT },
+      ...overrides,
+    });
+
+  test('viaje terminado: agrega completedAtMs, propina y ruta', () => {
+    expect(parseFinishedTrip('trip-1', finishedData())).toMatchObject({
+      id: 'trip-1',
+      status: 'paid',
+      fare: 14700,
+      completedAtMs: COMPLETED_AT.getTime(),
+      tip: 0,
+      routePolyline: 'abc',
+    });
+  });
+
+  test('sin completedAt: se descarta (no se puede ubicar por fecha)', () => {
+    expect(parseFinishedTrip('trip-1', finishedData({ completedAt: null }))).toBeNull();
+  });
+
+  test('propina inválida: se toma como 0; sin ruta: texto vacío', () => {
+    const trip = parseFinishedTrip('trip-1', finishedData({ tip: -5, routePolyline: undefined }));
+    expect(trip.tip).toBe(0);
+    expect(trip.routePolyline).toBe('');
+  });
+
+  test('viaje no terminado: se descarta', () => {
+    expect(parseFinishedTrip('trip-1', finishedData({ status: 'in_progress' }))).toBeNull();
   });
 });
 

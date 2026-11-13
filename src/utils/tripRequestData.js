@@ -108,6 +108,22 @@ export function parseTripSummary(id, data) {
   };
 }
 
+// Viaje terminado para el historial y las ganancias (S5, S6): lo mismo que el
+// resumen más la hora en que terminó (en milisegundos, para filtrar por fecha),
+// la propina y la ruta para dibujarla en el detalle. Sin completedAt no se
+// puede ubicar en el historial: se descarta.
+export function parseFinishedTrip(id, data) {
+  const summary = parseTripSummary(id, data);
+  const completedAt = data?.completedAt?.toDate?.();
+  if (!summary || !(completedAt instanceof Date) || Number.isNaN(completedAt.getTime())) return null;
+  return {
+    ...summary,
+    completedAtMs: completedAt.getTime(),
+    tip: Number.isInteger(data.tip) && data.tip >= 0 ? data.tip : 0,
+    routePolyline: typeof data.routePolyline === 'string' ? data.routePolyline : '',
+  };
+}
+
 // Segundos que le quedan al conductor, contados desde createdAt (la misma
 // referencia que usan las reglas). Nunca menos de 0 ni más del límite (si el
 // reloj del celular va un poco atrasado, no se muestran 17 s).
