@@ -1,13 +1,12 @@
 // src/navigation/TripStack.js
 // Stack del viaje (enunciado §3): Inicio → Solicitud → Viaje en curso → Cobro.
-// Inicio, Solicitud y Viaje en curso ya son pantallas reales; el Cobro sigue provisional.
 // AI-assisted: see docs/AI_LOG.md #3 (esqueleto) y #11 (Solicitud)
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import PlaceholderScreen from '../components/PlaceholderScreen';
 import HomeScreen from '../screens/main/HomeScreen';
 import TripRequestScreen from '../screens/main/TripRequestScreen';
 import TripInProgressScreen from '../screens/main/TripInProgressScreen';
+import TripSummaryScreen from '../screens/main/TripSummaryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -30,7 +29,14 @@ export default function TripStack() {
         component={TripInProgressScreen}
         options={{ title: 'Viaje en curso', headerBackVisible: false, gestureEnabled: false }}
       />
-      <Stack.Screen name="TripSummary" component={PlaceholderScreen} options={{ title: 'Cobro y resumen' }} />
+      {/* Cobro y resumen: se sale con "Volver al inicio" (si el viaje no se
+          ha cobrado, primero pide confirmación). Sin "atrás": volvería al
+          viaje en curso, que ya terminó. */}
+      <Stack.Screen
+        name="TripSummary"
+        component={TripSummaryScreen}
+        options={{ title: 'Cobro y resumen', headerBackVisible: false, gestureEnabled: false }}
+      />
     </Stack.Navigator>
   );
 }

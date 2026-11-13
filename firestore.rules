@@ -177,6 +177,8 @@ service cloud.firestore {
     // avanzar un paso a la vez (enunciado E1):
     //   requested → accepted / rejected → driver_arriving → in_progress → completed
     //   accepted / driver_arriving → cancelled (nunca después de in_progress)
+    //   completed → paid: en efectivo lo marca el conductor; por Mercado Pago,
+    //   el backend (al verificar el pago)
     match /trips/{tripId} {
 
       // El viaje es de este conductor (vale para leer uno y para consultas:
@@ -248,6 +250,14 @@ service cloud.firestore {
             && request.resource.data.cancelledAt == request.time)
         // "Finalizar".
         || (isTransition('in_progress', 'completed') && isValidCompletion())
+        // "Cobrar en efectivo": el conductor confirma que recibió el dinero.
+        // Solo viajes en efectivo: los de Mercado Pago los marca pagados el
+        // backend después de preguntarle a Mercado Pago (la app no puede).
+        || (isTransition('completed', 'paid')
+            && resource.data.paymentMethod == 'cash'
+            && onlyChanges(['status', 'paymentStatus', 'paidAt'])
+            && request.resource.data.paymentStatus == 'cash'
+            && request.resource.data.paidAt == request.time)
       );
 
       // Crear y borrar: nunca desde la app (solo el backend).
