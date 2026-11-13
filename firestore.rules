@@ -189,6 +189,29 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Token de notificaciones push de cada conductor: pushTokens/{uid}.
+    // Lo escribe la app (solo la APK de Android) y lo lee el backend con
+    // firebase-admin para enviar la notificación de una solicitud nueva.
+    match /pushTokens/{driverId} {
+
+      function isOwner() {
+        return request.auth != null && request.auth.uid == driverId;
+      }
+
+      function isValidPushToken(data) {
+        return data.keys().hasOnly(['token', 'platform', 'updatedAt'])
+               && data.keys().hasAll(['token', 'platform', 'updatedAt'])
+               && data.token is string
+               && data.token.size() > 0 && data.token.size() <= 4096
+               && data.platform == 'android'
+               && data.updatedAt == request.time;   // hora del servidor (serverTimestamp)
+      }
+
+      // Solo el propio conductor: guarda su token y lo borra al cerrar sesión.
+      allow read, delete: if isOwner();
+      allow create, update: if isOwner() && isValidPushToken(request.resource.data);
+    }
+
     // Viajes: trips/{tripId}. Los CREA solo el backend (firebase-admin, que se
     // salta estas reglas). La app del conductor solo lee los suyos y los hace
     // avanzar un paso a la vez (enunciado E1):

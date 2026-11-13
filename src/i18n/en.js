@@ -26,6 +26,9 @@ export default {
     account: 'Account',
     signOut: 'Sign out',
   },
+  push: {
+    channelName: 'Trip requests',
+  },
   options: {
     gender: { male: 'Male', female: 'Female', other: 'Other', undisclosed: 'Prefer not to say' },
     category: { economy: 'Economy', xl: 'XL', premium: 'Premium' },

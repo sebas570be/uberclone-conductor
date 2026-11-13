@@ -23,6 +23,7 @@ import SettingsScreen from '../screens/main/SettingsScreen';
 import { signOutDriver } from '../services/authService';
 import useSession from '../hooks/useSession';
 import useLanguage from '../hooks/useLanguage';
+import usePushNotifications from '../hooks/usePushNotifications';
 import { ActiveTripProvider } from '../context/ActiveTripContext';
 
 const Drawer = createDrawerNavigator();
@@ -76,6 +77,8 @@ function DrawerContent(props) {
 
 export default function MainDrawer() {
   const { t } = useLanguage();
+  // Notificaciones push de solicitudes (solo en la APK de Android).
+  usePushNotifications();
 
   return (
     <ActiveTripProvider>
