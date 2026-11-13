@@ -30,9 +30,16 @@ const CONFIG = Object.freeze({
   requestTimeoutMs: 10000,
   nominatimDelayMs: 1100, // Nominatim: máximo 1 consulta por segundo
 
-  // Igual a LOCATION.staleAfterMs de la app: un conductor que no envía
-  // ubicación hace más de 30 s se considera desconectado.
-  staleAfterMs: 30000,
+  // Ubicación de hace máximo 5 min. La app solo envía la ubicación abierta: un
+  // conductor Disponible con la app en segundo plano deja de enviarla, pero
+  // igual recibe la solicitud por notificación push (antes eran 30 s).
+  staleAfterMs: 5 * 60 * 1000,
+
+  // Notificación push (FCM). Vence a los 20 s: los 15 s para responder más los
+  // 5 s de margen que aceptan las reglas. Después la solicitud ya no sirve.
+  pushTtlMs: 20000,
+  // Mismo canal que crea la app (src/services/pushService.js).
+  pushChannelId: 'trip-requests',
 
   // Origen cerca del conductor y destino a unos km del origen (en línea recta).
   pickupDistanceMeters: Object.freeze({ min: 200, max: 1000 }),

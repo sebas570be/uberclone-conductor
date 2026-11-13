@@ -9,6 +9,7 @@ import {
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 import { goOffline } from './availabilityService';
+import { removePushToken } from './pushService';
 
 // Los mensajes de error los elige la pantalla (LoginScreen, AUTH_ERROR_KEYS)
 // en el idioma del conductor: aquí solo se lanza el error con su código.
@@ -34,13 +35,15 @@ export function signOut() {
 }
 
 // Cerrar sesión del conductor (menú y Configuración). Primero "No disponible"
-// (todavía con sesión, así las reglas lo permiten) y DESPUÉS signOut: si fuera
-// al revés, la escritura fallaría y quedaría Disponible en la base de datos.
+// y borrar el token de notificaciones (este celular deja de recibir
+// solicitudes de esta cuenta), todavía con sesión para que las reglas lo
+// permitan, y DESPUÉS signOut: si fuera al revés, las escrituras fallarían.
 // No hace falta navegar: el SessionContext ve que no hay usuario y
 // RootNavigator muestra el inicio de sesión.
 export async function signOutDriver(uid) {
   if (uid) {
     await goOffline(uid).catch((error) => console.log('No se pudo marcar No disponible:', error?.code));
+    await removePushToken(uid).catch((error) => console.log('No se pudo borrar el token de notificaciones:', error?.code));
   }
   await signOut();
 }

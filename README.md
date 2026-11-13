@@ -69,7 +69,7 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - **Frecuencia:** el GPS avisa cada 20 m y la ubicación se escribe en Firestore cada 5 s mientras el conductor está Disponible y en la pantalla Inicio. En iOS `timeInterval` no tiene efecto; por eso el envío usa un intervalo propio.
 - **Dónde se guarda:** colección aparte `driverLocations/{uid}` = `{ isAvailable, location, updatedAt }`. El registro (`drivers/{uid}`) no se reescribe cada 5 s, y quien necesite la ubicación no lee datos personales. Al pasar a No disponible, la ubicación se guarda en `null`.
 - **Reglas:** solo el dueño lee y escribe; ponerse Disponible exige `status == 'approved'` en su registro (verificado en el servidor con `get()`).
-- **Desconexión:** al cerrar sesión desde el menú, primero se marca No disponible y después se cierra la sesión. Si la app se cierra de golpe estando Disponible, el documento puede quedar con `isAvailable: true`; por eso una ubicación con `updatedAt` de más de 30 s se considera desconectada.
+- **Desconexión:** al cerrar sesión desde el menú, primero se marca No disponible y después se cierra la sesión. Si la app se cierra de golpe estando Disponible, el documento puede quedar con `isAvailable: true`; por eso la app considera desconectada una ubicación con `updatedAt` de más de 30 s. El script de solicitudes acepta hasta 5 minutos, para poder probar las notificaciones con la app en segundo plano (ver Notificaciones).
 - **Segundo plano:** con la app minimizada, iOS pausa los temporizadores de JavaScript y el envío se detiene hasta volver a abrirla. Enviar en segundo plano exige tareas en segundo plano y permiso "Siempre", que quedan fuera de Expo Go.
 - **Último estado del interruptor:** se guarda en AsyncStorage (`@uberclone_conductor:isAvailable:<uid>`), porque es una preferencia y no un dato sensible.
 
@@ -110,8 +110,19 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - **Permisos mínimos:** ubicación, cámara y fotos. `RECORD_AUDIO` (que `expo-image-picker` agrega para grabar video) está bloqueado en `blockedPermissions`, porque la app solo toma fotos.
 - **`http` en la red local:** Android bloquea el tráfico `http` en una APK; `expo-build-properties` lo permite (`usesCleartextTraffic`) para llegar al backend del PC. Solo sirve para la demo: en producción, `https`.
 - **R8 desactivado:** la primera APK se cerraba al abrir. Con `adb logcat` se vio `Failed to create an instance of class androidx.work.impl.WorkDatabase`: R8 (el optimizador de los builds de release) eliminaba una clase que WorkManager busca por su nombre. Se desactivó con `enableMinifyInReleaseBuilds: false` (la APK pesa algo más).
-- **Barra de navegación de Android:** las apps de Expo se dibujan detrás de esa barra (*edge-to-edge*); las pantallas del menú dejan su espacio con `SafeAreaView` (`screenLayout` del Drawer) para que no tape los botones (sin probar todavía en la APK; entra en el próximo build).
+- **Barra de navegación de Android:** las apps de Expo se dibujan detrás de esa barra (*edge-to-edge*); las pantallas del menú dejan su espacio con `SafeAreaView` (`screenLayout` del Drawer) para que no tape los botones.
 - **Probada en** un POCO X3 Pro (Android 12): inicio de sesión, mapa, Disponible, solicitud, viaje y cobro con Mercado Pago aprobado (capturas 124–134).
+
+## Notificaciones de solicitudes (push)
+
+- **Para qué:** con la app en segundo plano o cerrada, el conductor Disponible recibe una notificación cuando le llega una solicitud. Al tocarla, la app abre en Inicio, donde aparece la solicitud con su temporizador.
+- **Cómo:** Firebase Cloud Messaging (FCM) con `expo-notifications`. La app pide permiso, crea el canal "Solicitudes de viaje", obtiene el token FCM del celular (`getDevicePushTokenAsync`) y lo guarda en `pushTokens/{uid}`. El script de solicitudes (`npm run solicitud` en `backend/`) crea el viaje y envía la notificación con `firebase-admin`, en el idioma del conductor.
+- **Vence con la solicitud:** la notificación dura 20 s (`ttl`). Si el celular está sin conexión más tiempo, ya no llega, porque la solicitud (15 s) ya venció.
+- **Con la app abierta** no se muestra: la pantalla de la solicitud aparece sola (tiempo real).
+- **Seguridad:** las reglas de Firestore solo dejan a cada conductor leer, escribir y borrar su propio token, con campos fijos. Al cerrar sesión se borra el token, y si FCM responde que el token ya no sirve, el backend borra el documento. `google-services.json` no está en Git: EAS lo recibe como variable secreta de tipo archivo (`GOOGLE_SERVICES_JSON`).
+- **Conductor en segundo plano:** con la app minimizada la ubicación deja de enviarse, así que el script acepta conductores cuya última ubicación tenga hasta 5 minutos.
+- **Limitaciones:** funciona solo en la APK de Android. Expo Go no recibe notificaciones push desde la SDK 53, e iOS exige una cuenta de Apple Developer de pago. El enunciado nombra `@react-native-firebase/messaging`; se usó `expo-notifications`, el módulo de Expo equivalente.
+- **Probada en** el POCO X3 Pro (Android 12): con la app minimizada llega la notificación y, al tocarla, se abre la solicitud.
 
 ## Estado del desarrollo
 
@@ -127,6 +138,7 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - [x] Historial y resumen de ganancias
 - [x] Perfil, configuración e idioma (español / inglés)
 - [x] APK de Android con EAS Build (distribución interna)
+- [x] Notificaciones push de nuevas solicitudes (FCM, APK de Android)
 
 ## Uso de IA
 

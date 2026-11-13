@@ -27,6 +27,9 @@ export default {
     account: 'Cuenta',
     signOut: 'Cerrar sesión',
   },
+  push: {
+    channelName: 'Solicitudes de viaje',
+  },
   // Códigos que se guardan en Firestore → texto (A: la pantalla traduce el código).
   options: {
     gender: { male: 'Masculino', female: 'Femenino', other: 'Otro', undisclosed: 'Prefiero no decirlo' },

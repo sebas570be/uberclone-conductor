@@ -28,11 +28,12 @@ npm run solicitud -- mercadopago   # fuerza Mercado Pago
 
 El script:
 
-1. Busca un conductor en `driverLocations` con `isAvailable == true` y ubicación de hace menos de 30 s; revisa en `drivers` que esté `approved` y que no tenga otro viaje activo.
+1. Busca un conductor en `driverLocations` con `isAvailable == true` y ubicación de hace menos de 5 min (la app puede estar en segundo plano); revisa en `drivers` que esté `approved` y que no tenga otro viaje activo.
 2. Elige un origen a 200–1000 m del conductor y un destino a 2–6 km del origen.
 3. Pide **una sola vez** la ruta en carro a **OSRM** (distancia en km con 1 decimal, duración redondeada hacia arriba, polyline para dibujarla).
 4. Convierte las coordenadas en direcciones con **Nominatim** (máximo 1 consulta por segundo; si falla, se usan las coordenadas).
 5. Crea `trips/{id}` con `status: "requested"`.
+6. Envía una **notificación push** (Firebase Cloud Messaging) al token del conductor en `pushTokens/{uid}`, en su idioma, con prioridad alta y vencimiento de 20 s. Solo existe token en la APK de Android (Expo Go no recibe push). Si el token ya no sirve, se borra.
 
 La tarifa no se guarda aquí: la app la calcula con `calculateFare` (la misma función al estimar y al cobrar).
 
@@ -56,7 +57,7 @@ Como es la cuenta de prueba, no se mueve dinero real. El pago se hace con la cue
 
 ```bash
 npm start   # servidor en el puerto 3000, escucha en toda la red local
-npm test    # pruebas de las funciones de pago (node --test)
+npm test    # pruebas de las funciones de pago y del mensaje push (node --test)
 ```
 
 Desde el iPhone (mismo Wi-Fi) abre `http://IP-DEL-PC:3000/health`: debe responder `{"ok":true}`.

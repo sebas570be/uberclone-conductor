@@ -39,6 +39,10 @@ yarn-error.*
 backend/serviceAccountKey.json
 *-firebase-adminsdk-*.json
 
+# Configuración de Firebase para Android (notificaciones push). EAS la toma de
+# una variable de tipo archivo (GOOGLE_SERVICES_JSON), así que no hace falta en Git.
+google-services.json
+
 # typescript
 *.tsbuildinfo
 
