@@ -36,3 +36,7 @@ export const ACTIVE_TRIP_STATUSES = Object.freeze([
   TRIP_STATUS.DRIVER_ARRIVING,
   TRIP_STATUS.IN_PROGRESS,
 ]);
+
+// Viajes terminados: los que aparecen en el Historial y cuentan para Ganancias
+// (finalizados sin pagar y pagados). Cancelados y rechazados no mueven dinero.
+export const FINISHED_TRIP_STATUSES = Object.freeze([TRIP_STATUS.COMPLETED, TRIP_STATUS.PAID]);
