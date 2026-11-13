@@ -6,6 +6,8 @@
 // conductor aprobado y cualquier pantalla del menú puede leerlo.
 // AI-assisted: see docs/AI_LOG.md #3
 import React from 'react';
+import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   createDrawerNavigator,
   DrawerContentScrollView,
@@ -77,7 +79,16 @@ export default function MainDrawer() {
 
   return (
     <ActiveTripProvider>
-      <Drawer.Navigator drawerContent={(props) => <DrawerContent {...props} />}>
+      <Drawer.Navigator
+        drawerContent={(props) => <DrawerContent {...props} />}
+        // Android dibuja la app detrás de la barra de navegación (edge-to-edge):
+        // cada pantalla deja abajo el espacio de esa barra para que no tape botones.
+        screenLayout={({ children }) => (
+          <SafeAreaView edges={['bottom']} style={styles.screen}>
+            {children}
+          </SafeAreaView>
+        )}
+      >
         <Drawer.Screen
           name="Start"
           component={TripStack}
@@ -99,3 +110,10 @@ export default function MainDrawer() {
     </ActiveTripProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+});
