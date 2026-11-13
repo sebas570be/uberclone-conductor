@@ -6,15 +6,24 @@ Aplicación móvil multiplataforma inspirada en Uber (versión conductor), desar
 
 ## Tecnologías
 
-- Expo SDK 58 · React Native 0.88 · React 19.3
-- JavaScript
-- Jest + jest-expo (pruebas unitarias)
+- Expo SDK 58 · React Native 0.88 · React 19.3 · JavaScript
+- React Navigation 7 (Stack, Tabs y Drawer)
+- Firebase: Authentication y Cloud Firestore (tiempo real y reglas de seguridad)
+- Cloudinary (fotos del registro)
+- `expo-location`, `react-native-maps`, OSRM y Nominatim (ubicación, mapa y rutas)
+- Mercado Pago Checkout Pro en modo de prueba, con `expo-web-browser`
+- `expo-notifications` + Firebase Cloud Messaging (notificaciones push)
+- Backend: Node.js + Express 5 + `firebase-admin`
+- Jest + jest-expo (app) y `node --test` (backend)
+- EAS Build (APK de Android)
 
 ## Requisitos
 
 - Node.js y npm
 - Git
-- App **Expo Go** (compatible con SDK 58) en el celular, en la misma red que el computador
+- App **Expo Go** (compatible con SDK 58) en el celular, en la misma red Wi-Fi que el computador
+- El backend corriendo en el computador, para los pagos y para simular solicitudes (ver [backend/README.md](backend/README.md))
+- Para las notificaciones push: la APK de Android (Expo Go no las recibe; ver la sección APK)
 
 ## Instalación y ejecución
 
@@ -27,10 +36,20 @@ npx expo start
 
 Escanea el código QR con Expo Go (Android) o con la cámara (iPhone).
 
+En otras dos terminales, el backend (la configuración de la cuenta de servicio y de Mercado Pago está en [backend/README.md](backend/README.md)):
+
+```bash
+cd backend
+npm install
+npm start                    # servidor de pagos (puerto 3000)
+npm run solicitud -- cash    # en otra terminal: simula una solicitud de viaje
+```
+
 ## Pruebas
 
 ```bash
-npm test
+npm test                 # app: Jest + jest-expo
+cd backend && npm test   # backend: node --test
 ```
 
 ## Variables de entorno
@@ -39,6 +58,13 @@ Las llaves **no se suben al repositorio**: van en archivos `.env`, que están en
 
 - **`.env` (raíz, la app):** configuración web de Firebase, Cloudinary (upload preset sin firma) y `EXPO_PUBLIC_API_URL`, la dirección del backend de pagos (en Expo Go, `http://IP-DEL-PC:3000`). Ninguno es secreto.
 - **`backend/.env`:** ruta de la llave de la cuenta de servicio de Firebase y `MP_ACCESS_TOKEN` de Mercado Pago. **Son secretos**: solo viven en el PC. Ver [backend/README.md](backend/README.md).
+- **Variables de EAS (para generar la APK):** las `EXPO_PUBLIC_*`, `GOOGLE_MAPS_ANDROID_API_KEY` (sensible; `app.config.js` la pone en la configuración del mapa) y `GOOGLE_SERVICES_JSON` (secreta, de tipo archivo: el `google-services.json` de Firebase para las notificaciones). Ni el `.env` ni `google-services.json` se suben a Git ni a EAS.
+
+## Sesión
+
+- Firebase Auth guarda la sesión con su método oficial para React Native (`getReactNativePersistence(AsyncStorage)`), así el conductor no inicia sesión cada vez que abre la app. Se descartó SecureStore porque limita cada valor a 2048 bytes y no acepta claves con ":", así que exigiría un adaptador propio.
+- Lo demás que la app guarda en el celular son preferencias (idioma y último estado del interruptor), nunca datos sensibles.
+- La app cambia de pantalla sola según el estado del conductor en `drivers/{uid}`: sin registro → registro; registro enviado → "Pendiente de aprobación"; aprobado → menú.
 
 ## Estructura del proyecto
 
