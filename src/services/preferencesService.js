@@ -26,3 +26,25 @@ export async function saveLastAvailability(uid, isAvailable) {
     console.log('No se pudo guardar la disponibilidad:', error?.message);
   }
 }
+
+// Idioma de la app: es del CELULAR (no del conductor), porque se necesita
+// antes de iniciar sesión (pantalla de inicio de sesión).
+const LANGUAGE_KEY = '@uberclone_conductor:language';
+
+export async function getSavedLanguage() {
+  try {
+    const saved = await AsyncStorage.getItem(LANGUAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  } catch (error) {
+    console.log('No se pudo leer el idioma guardado:', error?.message);
+    return null;
+  }
+}
+
+export async function saveLanguage(language) {
+  try {
+    await AsyncStorage.setItem(LANGUAGE_KEY, JSON.stringify(language));
+  } catch (error) {
+    console.log('No se pudo guardar el idioma:', error?.message);
+  }
+}

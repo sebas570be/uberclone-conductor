@@ -8,6 +8,7 @@ import {
   signOut as firebaseSignOut,
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
+import { goOffline } from './availabilityService';
 
 // Mensajes en español para los códigos de error de Firebase.
 // Ojo: con la protección contra enumeración de correos (activa por defecto en
@@ -44,4 +45,16 @@ export async function signIn(email, password) {
 
 export function signOut() {
   return firebaseSignOut(auth);
+}
+
+// Cerrar sesión del conductor (menú y Configuración). Primero "No disponible"
+// (todavía con sesión, así las reglas lo permiten) y DESPUÉS signOut: si fuera
+// al revés, la escritura fallaría y quedaría Disponible en la base de datos.
+// No hace falta navegar: el SessionContext ve que no hay usuario y
+// RootNavigator muestra el inicio de sesión.
+export async function signOutDriver(uid) {
+  if (uid) {
+    await goOffline(uid).catch((error) => console.log('No se pudo marcar No disponible:', error?.code));
+  }
+  await signOut();
 }

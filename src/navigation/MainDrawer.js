@@ -1,6 +1,7 @@
 // src/navigation/MainDrawer.js
 // Drawer del conductor aprobado (enunciado F8): Inicio (con el TripStack),
-// Historial, Ganancias y Perfil, y al final "Cerrar sesión".
+// Historial, Ganancias, Perfil y Configuración, y al final "Cerrar sesión".
+// Los títulos salen del idioma elegido (useLanguage).
 // ActiveTripProvider envuelve el menú: el viaje activo solo existe para el
 // conductor aprobado y cualquier pantalla del menú puede leerlo.
 // AI-assisted: see docs/AI_LOG.md #3
@@ -16,9 +17,10 @@ import TripStack from './TripStack';
 import EarningsScreen from '../screens/main/EarningsScreen';
 import HistoryStack from './HistoryStack';
 import ProfileStack from './ProfileStack';
-import { signOut } from '../services/authService';
-import { saveDriverLocation } from '../services/locationService';
+import SettingsScreen from '../screens/main/SettingsScreen';
+import { signOutDriver } from '../services/authService';
 import useSession from '../hooks/useSession';
+import useLanguage from '../hooks/useLanguage';
 import { ActiveTripProvider } from '../context/ActiveTripContext';
 
 const Drawer = createDrawerNavigator();
@@ -29,7 +31,7 @@ const Drawer = createDrawerNavigator();
 function startOptions({ route }) {
   const focusedScreen = getFocusedRouteNameFromRoute(route) ?? 'Home';
   const isHome = focusedScreen === 'Home';
-  return { title: 'Inicio', headerShown: isHome, swipeEnabled: isHome };
+  return { headerShown: isHome, swipeEnabled: isHome };
 }
 
 // Historial: el encabezado y el gesto del Drawer solo en la lista; en el
@@ -37,38 +39,31 @@ function startOptions({ route }) {
 // de deslizar a la derecha vuelva a la lista (como en Inicio).
 function historyOptions({ route }) {
   const isList = (getFocusedRouteNameFromRoute(route) ?? 'HistoryList') === 'HistoryList';
-  return { title: 'Historial', headerShown: isList, swipeEnabled: isList };
+  return { headerShown: isList, swipeEnabled: isList };
 }
 
 // Perfil: lo mismo que Historial (encabezado y gesto del Drawer solo en el Perfil).
 function profileOptions({ route }) {
   const isHome = (getFocusedRouteNameFromRoute(route) ?? 'ProfileHome') === 'ProfileHome';
-  return { title: 'Perfil', headerShown: isHome, swipeEnabled: isHome };
+  return { headerShown: isHome, swipeEnabled: isHome };
 }
 
 // Contenido del menú: las pantallas de siempre (DrawerItemList) y debajo
-// "Cerrar sesión". No hace falta navegar al login: al cerrar sesión, el
-// SessionContext detecta que no hay usuario y RootNavigator cambia solo.
+// "Cerrar sesión" (la misma función de Configuración: primero No disponible,
+// después signOut). No hace falta navegar al login: RootNavigator cambia solo.
 function DrawerContent(props) {
   const { user } = useSession();
+  const { t } = useLanguage();
 
-  // Primero se marca "No disponible" (todavía con sesión, así las reglas lo
-  // permiten) y DESPUÉS se cierra sesión. Si fuera al revés, la escritura
-  // fallaría y el conductor quedaría como disponible en la base de datos.
-  const handleSignOut = async () => {
-    if (user?.uid) {
-      await saveDriverLocation(user.uid, false, null).catch((error) =>
-        console.log('No se pudo marcar No disponible:', error?.code)
-      );
-    }
-    signOut().catch((error) => console.log('Error al cerrar sesión:', error.code));
+  const handleSignOut = () => {
+    signOutDriver(user?.uid).catch((error) => console.log('Error al cerrar sesión:', error?.code));
   };
 
   return (
     <DrawerContentScrollView {...props}>
       <DrawerItemList {...props} />
       <DrawerItem
-        label="Cerrar sesión"
+        label={t('drawer.signOut')}
         labelStyle={{ color: '#DC2626' }}
         onPress={handleSignOut}
         accessibilityRole="button"
@@ -78,13 +73,28 @@ function DrawerContent(props) {
 }
 
 export default function MainDrawer() {
+  const { t } = useLanguage();
+
   return (
     <ActiveTripProvider>
       <Drawer.Navigator drawerContent={(props) => <DrawerContent {...props} />}>
-        <Drawer.Screen name="Start" component={TripStack} options={startOptions} />
-        <Drawer.Screen name="History" component={HistoryStack} options={historyOptions} />
-        <Drawer.Screen name="Earnings" component={EarningsScreen} options={{ title: 'Ganancias' }} />
-        <Drawer.Screen name="Profile" component={ProfileStack} options={profileOptions} />
+        <Drawer.Screen
+          name="Start"
+          component={TripStack}
+          options={(props) => ({ ...startOptions(props), title: t('drawer.start') })}
+        />
+        <Drawer.Screen
+          name="History"
+          component={HistoryStack}
+          options={(props) => ({ ...historyOptions(props), title: t('drawer.history') })}
+        />
+        <Drawer.Screen name="Earnings" component={EarningsScreen} options={{ title: t('drawer.earnings') }} />
+        <Drawer.Screen
+          name="Profile"
+          component={ProfileStack}
+          options={(props) => ({ ...profileOptions(props), title: t('drawer.profile') })}
+        />
+        <Drawer.Screen name="Settings" component={SettingsScreen} options={{ title: t('drawer.settings') }} />
       </Drawer.Navigator>
     </ActiveTripProvider>
   );

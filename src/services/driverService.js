@@ -4,7 +4,7 @@
 import { doc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { buildDriverDocument } from '../utils/driverDocument';
-import { buildProfileUpdate, isLocalPhoto } from '../utils/driverProfile';
+import { buildProfileUpdate, isLocalPhoto, profileFormFromDriver } from '../utils/driverProfile';
 import { requiresTechnicalReview } from '../utils/validators';
 import { uploadPhoto } from './photoService';
 
@@ -65,6 +65,12 @@ export async function updateDriverProfile(uid, driver, form) {
     await updateDoc(doc(db, 'drivers', uid), update);
   }
   return { changedFields, needsReview };
+}
+
+// Idioma (Configuración): se guarda con la misma función del perfil. Es un
+// campo directo: el conductor sigue aprobado.
+export function updateDriverLanguage(uid, driver, language) {
+  return updateDriverProfile(uid, driver, { ...profileFormFromDriver(driver), language });
 }
 
 // Mensajes en español para los errores de Firestore.
