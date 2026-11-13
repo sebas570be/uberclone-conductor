@@ -5,8 +5,11 @@
 import React from 'react';
 import { Pressable, Text, StyleSheet } from 'react-native';
 import { signOut } from '../services/authService';
+import useLanguage from '../hooks/useLanguage';
 
 export default function SignOutButton() {
+  const { t } = useLanguage();
+
   const handlePress = () => {
     signOut().catch((error) => {
       console.log('No se pudo cerrar sesión:', error.code);
@@ -14,8 +17,8 @@ export default function SignOutButton() {
   };
 
   return (
-    <Pressable onPress={handlePress} hitSlop={8} accessibilityRole="button" accessibilityLabel="Cerrar sesión">
-      <Text style={styles.text}>Salir</Text>
+    <Pressable onPress={handlePress} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('drawer.signOut')}>
+      <Text style={styles.text}>{t('common.exit')}</Text>
     </Pressable>
   );
 }

@@ -3,6 +3,8 @@
 // Regla del enunciado: los errores van DEBAJO de cada campo, nunca en Alert.
 // Al iniciar sesión o crear la cuenta no hace falta navegar: el SessionContext
 // detecta el usuario y RootNavigator cambia de pantalla solo.
+// Textos en el idioma elegido (useLanguage): el idioma se guarda en el celular,
+// así que se conoce incluso antes de iniciar sesión.
 import React, { useState } from 'react';
 import {
   View,
@@ -13,17 +15,33 @@ import {
   ScrollView,
   StyleSheet,
 } from 'react-native';
-import { signIn, signUp, getAuthErrorMessage } from '../../services/authService';
+import { signIn, signUp } from '../../services/authService';
 import { isValidEmail } from '../../utils/validators';
+import useLanguage from '../../hooks/useLanguage';
 
 const MIN_PASSWORD_LENGTH = 6; // mínimo que exige Firebase Authentication
 
+// Código de error de Firebase Authentication → clave del texto.
+// Ojo: con la protección contra enumeración de correos (activa por defecto en
+// proyectos nuevos), un correo inexistente y una contraseña equivocada dan el
+// mismo código "auth/invalid-credential", para no revelar qué correos existen.
+const AUTH_ERROR_KEYS = Object.freeze({
+  'auth/email-already-in-use': 'auth.emailInUse',
+  'auth/invalid-email': 'auth.invalidEmail',
+  'auth/weak-password': 'auth.weakPassword',
+  'auth/invalid-credential': 'auth.invalidCredential',
+  'auth/too-many-requests': 'auth.tooManyRequests',
+  'auth/network-request-failed': 'common.offlineError',
+});
+const authErrorKey = (error) => AUTH_ERROR_KEYS[error?.code] ?? 'auth.unknown';
+
 export default function LoginScreen() {
+  const { t } = useLanguage();
   const [isSignUp, setIsSignUp] = useState(false); // false = iniciar sesión, true = crear cuenta
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [errors, setErrors] = useState({}); // { email, password }: error de cada campo
-  const [formError, setFormError] = useState(null); // error que devuelve Firebase
+  const [errors, setErrors] = useState({}); // { email, password }: clave del error de cada campo
+  const [formError, setFormError] = useState(null); // clave del error que devuelve Firebase
   const [isLoading, setIsLoading] = useState(false);
 
   // Valida antes de llamar a Firebase: así el usuario ve el error al instante
@@ -31,10 +49,10 @@ export default function LoginScreen() {
   const validate = () => {
     const newErrors = {};
     if (!isValidEmail(email)) {
-      newErrors.email = 'Escribe un correo válido (ejemplo: nombre@gmail.com).';
+      newErrors.email = 'login.invalidEmail';
     }
     if (password.length < MIN_PASSWORD_LENGTH) {
-      newErrors.password = `La contraseña debe tener al menos ${MIN_PASSWORD_LENGTH} caracteres.`;
+      newErrors.password = 'login.shortPassword';
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -52,7 +70,7 @@ export default function LoginScreen() {
         await signIn(email, password);
       }
     } catch (error) {
-      setFormError(getAuthErrorMessage(error));
+      setFormError(authErrorKey(error));
     } finally {
       // finally: el botón se reactiva tanto si salió bien como si falló
       setIsLoading(false);
@@ -77,10 +95,10 @@ export default function LoginScreen() {
       keyboardDismissMode="on-drag"
       automaticallyAdjustKeyboardInsets
     >
-      <Text style={styles.title}>{isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
-      <Text style={styles.subtitle}>UberClone · Conductor</Text>
+      <Text style={styles.title}>{isSignUp ? t('login.signUp') : t('login.signIn')}</Text>
+      <Text style={styles.subtitle}>{t('login.subtitle')}</Text>
 
-      <Text style={styles.label}>Correo</Text>
+      <Text style={styles.label}>{t('fields.email')}</Text>
       <TextInput
         style={[styles.input, errors.email && styles.inputError]}
         value={email}
@@ -92,16 +110,16 @@ export default function LoginScreen() {
         autoComplete="email"
         textContentType="emailAddress"
         returnKeyType="done"
-        accessibilityLabel="Correo"
+        accessibilityLabel={t('fields.email')}
       />
-      {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
+      {errors.email && <Text style={styles.errorText}>{t(errors.email)}</Text>}
 
-      <Text style={styles.label}>Contraseña</Text>
+      <Text style={styles.label}>{t('login.password')}</Text>
       <TextInput
         style={[styles.input, errors.password && styles.inputError]}
         value={password}
         onChangeText={setPassword}
-        placeholder="Mínimo 6 caracteres"
+        placeholder={t('login.passwordPlaceholder')}
         secureTextEntry
         autoCapitalize="none"
         // iOS: le dice qué tipo de campo es (contraseña guardada o nueva), así
@@ -109,9 +127,11 @@ export default function LoginScreen() {
         textContentType={isSignUp ? 'newPassword' : 'password'}
         autoComplete={isSignUp ? 'new-password' : 'current-password'}
         returnKeyType="done"
-        accessibilityLabel="Contraseña"
+        accessibilityLabel={t('login.password')}
       />
-      {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
+      {errors.password && (
+        <Text style={styles.errorText}>{t(errors.password, { min: MIN_PASSWORD_LENGTH })}</Text>
+      )}
 
       <Pressable
         style={[styles.button, isLoading && styles.buttonDisabled]}
@@ -122,15 +142,15 @@ export default function LoginScreen() {
         {isLoading ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={styles.buttonText}>{isSignUp ? 'Crear cuenta' : 'Iniciar sesión'}</Text>
+          <Text style={styles.buttonText}>{isSignUp ? t('login.signUp') : t('login.signIn')}</Text>
         )}
       </Pressable>
 
-      {formError && <Text style={styles.errorText}>{formError}</Text>}
+      {formError && <Text style={styles.errorText}>{t(formError)}</Text>}
 
       <Pressable onPress={toggleMode} disabled={isLoading} accessibilityRole="button">
         <Text style={styles.link}>
-          {isSignUp ? '¿Ya tienes cuenta? Inicia sesión' : '¿No tienes cuenta? Crea una'}
+          {isSignUp ? t('login.toSignIn') : t('login.toSignUp')}
         </Text>
       </Pressable>
     </ScrollView>

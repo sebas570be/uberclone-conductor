@@ -5,7 +5,6 @@ import {
   filterTrips,
   summarizeEarnings,
   calculateBalance,
-  historyStatusLabel,
 } from '../earnings';
 
 // Jueves 12 de noviembre de 2026, 20:30 (hora del celular).
@@ -159,13 +158,5 @@ describe('calculateBalance', () => {
 
   test('los viajes sin pagar no cambian el saldo', () => {
     expect(calculateBalance([trip({ status: 'completed', paymentStatus: null })])).toBe(0);
-  });
-});
-
-describe('historyStatusLabel', () => {
-  test('pagado: cómo se pagó; sin pagar: Pendiente de pago', () => {
-    expect(historyStatusLabel(trip())).toBe('Aprobado');
-    expect(historyStatusLabel(trip({ paymentMethod: 'cash', paymentStatus: 'cash' }))).toBe('Efectivo');
-    expect(historyStatusLabel(trip({ status: 'completed', paymentStatus: 'rejected' }))).toBe('Pendiente de pago');
   });
 });

@@ -5,7 +5,6 @@
 // es [inicio, fin): incluye el inicio y NO el fin (el día siguiente a las 00:00).
 import { PERIOD } from '../config/history';
 import { TRIP_STATUS } from '../config/tripRequest';
-import { paymentStatusLabel } from './tripRequestData';
 
 function startOfDay(date) {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate());
@@ -86,11 +85,4 @@ export function calculateBalance(trips) {
       if (trip.paymentMethod === 'cash') return balance - trip.commission;
       return balance + trip.driverEarnings;
     }, 0);
-}
-
-// Texto del estado para el historial (HI3): los pagados muestran cómo se
-// pagaron; los finalizados sin pagar, "Pendiente de pago".
-export function historyStatusLabel(trip) {
-  if (trip.status === TRIP_STATUS.COMPLETED) return 'Pendiente de pago';
-  return paymentStatusLabel(trip.paymentStatus);
 }

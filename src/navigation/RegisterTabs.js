@@ -10,6 +10,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import SignOutButton from '../components/SignOutButton';
 import { RegistrationProvider } from '../context/RegistrationContext';
 import useRegistration from '../hooks/useRegistration';
+import useLanguage from '../hooks/useLanguage';
 import { hasErrors } from '../utils/registrationErrors';
 import { PERSONAL_DATA_FIELDS, VEHICLE_FIELDS } from '../constants/registrationFields';
 import PersonalDataScreen from '../screens/register/PersonalDataScreen';
@@ -29,6 +30,7 @@ export default function RegisterTabs() {
 // Componente aparte porque useRegistration solo funciona DENTRO del Provider.
 function RegisterTabNavigator() {
   const { personalDataErrors, vehicleErrors, touchFields } = useRegistration();
+  const { t } = useLanguage();
 
   const isPersonalDataComplete = !hasErrors(personalDataErrors);
   const isVehicleComplete = !hasErrors(vehicleErrors);
@@ -53,23 +55,27 @@ function RegisterTabNavigator() {
   const lockedOptions = (title, isLocked, requirement) => ({
     title,
     tabBarItemStyle: isLocked ? { opacity: 0.4 } : undefined,
-    tabBarAccessibilityLabel: isLocked ? `${title}, bloqueada: primero completa ${requirement}` : title,
+    tabBarAccessibilityLabel: isLocked ? t('register.locked', { title, requirement }) : title,
   });
 
   return (
     // "Salir" en el encabezado: en el registro todavía no hay menú para cerrar sesión.
     <Tab.Navigator screenOptions={{ headerRight: () => <SignOutButton /> }}>
-      <Tab.Screen name="PersonalData" component={PersonalDataScreen} options={{ title: 'Datos personales' }} />
+      <Tab.Screen name="PersonalData" component={PersonalDataScreen} options={{ title: t('profile.personalData') }} />
       <Tab.Screen
         name="Vehicle"
         component={VehicleScreen}
-        options={lockedOptions('Vehículo', !isPersonalDataComplete, 'Datos personales')}
+        options={lockedOptions(t('register.vehicleTab'), !isPersonalDataComplete, t('profile.personalData'))}
         listeners={blockUntilComplete(isPersonalDataComplete)}
       />
       <Tab.Screen
         name="Documents"
         component={DocumentsScreen}
-        options={lockedOptions('Documentos', !(isPersonalDataComplete && isVehicleComplete), 'Datos personales y Vehículo')}
+        options={lockedOptions(
+          t('profile.documents'),
+          !(isPersonalDataComplete && isVehicleComplete),
+          t('register.personalAndVehicle')
+        )}
         listeners={blockUntilComplete(isPersonalDataComplete && isVehicleComplete)}
       />
     </Tab.Navigator>

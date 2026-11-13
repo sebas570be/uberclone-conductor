@@ -107,13 +107,3 @@ export async function collectCash(tripId) {
     paidAt: serverTimestamp(),
   });
 }
-
-// Mensaje para el conductor según el error.
-// permission-denied aquí significa que las reglas negaron la respuesta: la
-// solicitud venció (más de 20 s) o ya no está en "requested".
-export function getTripErrorMessage(error) {
-  if (error?.code === 'permission-denied') {
-    return 'La solicitud ya venció o ya no está disponible.';
-  }
-  return 'No se pudo enviar tu respuesta. Revisa tu conexión e inténtalo de nuevo.';
-}

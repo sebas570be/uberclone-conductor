@@ -4,35 +4,38 @@
 // método de pago. FlatList muestra 20 y carga 20 más al llegar al final (HI7).
 // Los filtros se aplican en la app con useMemo (sin nuevas consultas).
 // Al tocar un viaje se abre su detalle (HI4).
+// Textos en el idioma elegido (useLanguage).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import useFinishedTrips from '../../hooks/useFinishedTrips';
+import useLanguage from '../../hooks/useLanguage';
 import DateField from '../../components/DateField';
 import { HISTORY, PERIOD } from '../../config/history';
-import { getPeriodRange, getCustomRange, filterTrips, historyStatusLabel } from '../../utils/earnings';
-import { formatCop, paymentMethodLabel } from '../../utils/tripRequestData';
+import { getPeriodRange, getCustomRange, filterTrips } from '../../utils/earnings';
+import { formatCop } from '../../utils/tripRequestData';
 import { formatDateTime } from '../../utils/dates';
-import { CATEGORY_OPTIONS, labelFor } from '../../constants/registrationOptions';
+import { optionLabel, paymentMethodText, historyStatusText } from '../../i18n/labels';
 import { TRIP_STATUS } from '../../config/tripRequest';
 
 const RANGE = 'range'; // "Rango de fechas": se eligen Desde y Hasta
 
+// labelKey: clave del texto en src/i18n.
 const PERIOD_OPTIONS = [
-  { value: PERIOD.TODAY, label: 'Hoy' },
-  { value: PERIOD.WEEK, label: 'Semana' },
-  { value: PERIOD.MONTH, label: 'Mes' },
-  { value: RANGE, label: 'Rango' },
+  { value: PERIOD.TODAY, labelKey: 'periods.today' },
+  { value: PERIOD.WEEK, labelKey: 'periods.week' },
+  { value: PERIOD.MONTH, labelKey: 'periods.month' },
+  { value: RANGE, labelKey: 'periods.range' },
 ];
 
 const PAYMENT_OPTIONS = [
-  { value: 'all', label: 'Todos' },
-  { value: 'mercadopago', label: 'Mercado Pago' },
-  { value: 'cash', label: 'Efectivo' },
+  { value: 'all', labelKey: 'history.allPayments' },
+  { value: 'mercadopago', labelKey: 'paymentMethod.mercadopago' },
+  { value: 'cash', labelKey: 'paymentMethod.cash' },
 ];
 
 // Fila de botones para elegir una opción (periodo o método de pago).
-function OptionRow({ options, selected, onSelect }) {
+function OptionRow({ options, selected, onSelect, t }) {
   return (
     <View style={styles.options} accessibilityRole="tablist">
       {options.map((option) => {
@@ -45,7 +48,7 @@ function OptionRow({ options, selected, onSelect }) {
             accessibilityRole="tab"
             accessibilityState={{ selected: isSelected }}
           >
-            <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>{option.label}</Text>
+            <Text style={[styles.optionText, isSelected && styles.optionTextSelected]}>{t(option.labelKey)}</Text>
           </Pressable>
         );
       })}
@@ -55,28 +58,28 @@ function OptionRow({ options, selected, onSelect }) {
 
 // Un viaje de la lista (HI3): fecha y hora, origen → destino, categoría,
 // tarifa, ganancia y estado del pago. Al tocarlo se abre el detalle.
-function TripItem({ trip, onPress }) {
+function TripItem({ trip, onPress, t }) {
   const isUnpaid = trip.status === TRIP_STATUS.COMPLETED;
   return (
     <Pressable
       style={styles.item}
       onPress={() => onPress(trip.id)}
       accessibilityRole="button"
-      accessibilityHint="Abre el detalle del viaje"
+      accessibilityHint={t('history.openDetailHint')}
     >
       <View style={styles.itemHeader}>
         <Text style={styles.itemDate}>{formatDateTime(new Date(trip.completedAtMs))}</Text>
-        <Text style={[styles.badge, isUnpaid ? styles.badgeUnpaid : styles.badgePaid]}>{historyStatusLabel(trip)}</Text>
+        <Text style={[styles.badge, isUnpaid ? styles.badgeUnpaid : styles.badgePaid]}>{historyStatusText(t, trip)}</Text>
       </View>
       <Text style={styles.itemRoute} numberOfLines={2}>
         {trip.origin.address} → {trip.destination.address}
       </Text>
       <Text style={styles.itemDetail}>
-        {labelFor(CATEGORY_OPTIONS, trip.category)} · {paymentMethodLabel(trip.paymentMethod)}
+        {optionLabel(t, 'category', trip.category)} · {paymentMethodText(t, trip.paymentMethod)}
       </Text>
       <View style={styles.itemAmounts}>
-        <Text style={styles.itemFare}>Tarifa {formatCop(trip.fare)}</Text>
-        <Text style={styles.itemEarnings}>Ganancia {formatCop(trip.driverEarnings)}</Text>
+        <Text style={styles.itemFare}>{t('history.fare', { amount: formatCop(trip.fare) })}</Text>
+        <Text style={styles.itemEarnings}>{t('history.earnings', { amount: formatCop(trip.driverEarnings) })}</Text>
       </View>
     </Pressable>
   );
@@ -84,6 +87,7 @@ function TripItem({ trip, onPress }) {
 
 export default function HistoryScreen({ navigation }) {
   const { trips, isLoading, hasError } = useFinishedTrips();
+  const { t } = useLanguage();
   const [period, setPeriod] = useState(PERIOD.MONTH);
   const [paymentMethod, setPaymentMethod] = useState('all');
   const [fromDate, setFromDate] = useState(() => new Date());
@@ -121,7 +125,8 @@ export default function HistoryScreen({ navigation }) {
   }, [filteredTrips.length]);
 
   const openDetail = useCallback((tripId) => navigation.navigate('TripDetail', { tripId }), [navigation]);
-  const renderItem = useCallback(({ item }) => <TripItem trip={item} onPress={openDetail} />, [openDetail]);
+  // t es dependencia: al cambiar el idioma, los ítems se vuelven a dibujar.
+  const renderItem = useCallback(({ item }) => <TripItem trip={item} onPress={openDetail} t={t} />, [openDetail, t]);
 
   if (isLoading) {
     return (
@@ -134,33 +139,33 @@ export default function HistoryScreen({ navigation }) {
   if (hasError) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>No se pudo cargar tu historial. Revisa tu conexión.</Text>
+        <Text style={styles.error}>{t('history.loadError')}</Text>
       </View>
     );
   }
 
   const filters = (
     <View>
-      <OptionRow options={PERIOD_OPTIONS} selected={period} onSelect={setPeriod} />
+      <OptionRow options={PERIOD_OPTIONS} selected={period} onSelect={setPeriod} t={t} />
       {period === RANGE ? (
         <View style={styles.rangeFields}>
           <View style={styles.rangeField}>
-            <DateField label="Desde" value={fromDate} onChange={setFromDate} maximumDate={new Date()} />
+            <DateField label={t('history.from')} value={fromDate} onChange={setFromDate} maximumDate={new Date()} />
           </View>
           <View style={styles.rangeField}>
             <DateField
-              label="Hasta"
+              label={t('history.to')}
               value={toDate}
               onChange={setToDate}
               maximumDate={new Date()}
-              error={isInvalidRange ? '"Desde" no puede ser después de "Hasta".' : undefined}
+              error={isInvalidRange ? t('history.invalidRange') : undefined}
             />
           </View>
         </View>
       ) : null}
-      <OptionRow options={PAYMENT_OPTIONS} selected={paymentMethod} onSelect={setPaymentMethod} />
+      <OptionRow options={PAYMENT_OPTIONS} selected={paymentMethod} onSelect={setPaymentMethod} t={t} />
       <Text style={styles.count}>
-        {filteredTrips.length} {filteredTrips.length === 1 ? 'viaje' : 'viajes'}
+        {t(filteredTrips.length === 1 ? 'history.countOne' : 'history.countMany', { count: filteredTrips.length })}
       </Text>
     </View>
   );
@@ -172,12 +177,12 @@ export default function HistoryScreen({ navigation }) {
       renderItem={renderItem}
       ListHeaderComponent={filters}
       ListEmptyComponent={
-        isInvalidRange ? null : <Text style={styles.empty}>No hay viajes en este filtro.</Text>
+        isInvalidRange ? null : <Text style={styles.empty}>{t('history.empty')}</Text>
       }
       ListFooterComponent={
         visibleTrips.length < filteredTrips.length ? (
           <Text style={styles.footer}>
-            Mostrando {visibleTrips.length} de {filteredTrips.length}
+            {t('history.showing', { visible: visibleTrips.length, total: filteredTrips.length })}
           </Text>
         ) : null
       }

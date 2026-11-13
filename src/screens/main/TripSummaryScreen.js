@@ -7,6 +7,8 @@
 // (expo-web-browser) y al cerrarlo se le pide al backend que lo verifique.
 // Se puede salir sin cobrar, con aviso: el viaje queda en "completed" (por
 // cobrar) y el conductor puede seguir trabajando.
+// Textos en el idioma elegido (useLanguage). Los mensajes guardan la CLAVE del
+// texto, así cambian de idioma aunque ya estén en pantalla.
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { usePreventRemove } from '@react-navigation/native';
@@ -14,8 +16,9 @@ import * as WebBrowser from 'expo-web-browser';
 import { TRIP_STATUS, PAYMENT_STATUS } from '../../config/tripRequest';
 import { subscribeToTrip, collectCash } from '../../services/tripService';
 import { startMercadoPagoPayment, verifyMercadoPagoPayment } from '../../services/paymentService';
-import { getPaymentErrorMessage, getVerifyMessage } from '../../utils/paymentRequest';
-import { parseTripSummary, formatCop, paymentMethodLabel, paymentStatusLabel } from '../../utils/tripRequestData';
+import { parseTripSummary, formatCop } from '../../utils/tripRequestData';
+import useLanguage from '../../hooks/useLanguage';
+import { paymentMethodText, paymentStatusText, paymentErrorKey, verifyMessageKey } from '../../i18n/labels';
 
 function DetailRow({ label, value }) {
   return (
@@ -26,22 +29,20 @@ function DetailRow({ label, value }) {
   );
 }
 
-// Mensaje para el conductor si el cobro en efectivo falla.
+// Clave del mensaje si el cobro en efectivo falla.
 // permission-denied: las reglas lo negaron (el viaje ya no está "completed").
-function getCashErrorMessage(error) {
-  if (error?.code === 'permission-denied') {
-    return 'No se pudo registrar el cobro: el estado del viaje ya cambió.';
-  }
-  return 'No se pudo registrar el cobro. Revisa tu conexión e inténtalo de nuevo.';
+function cashErrorKey(error) {
+  return error?.code === 'permission-denied' ? 'tripSummary.cashStatusChanged' : 'tripSummary.cashError';
 }
 
 export default function TripSummaryScreen({ route, navigation }) {
   const { tripId } = route.params;
+  const { t } = useLanguage();
   const [trip, setTrip] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [infoMessage, setInfoMessage] = useState('');
+  const [errorKey, setErrorKey] = useState(null); // claves de los textos
+  const [infoKey, setInfoKey] = useState(null);
   // useRef: evita dos cobros a la vez (doble toque) sin esperar a que se
   // vuelva a dibujar la pantalla.
   const isBusyRef = useRef(false);
@@ -74,45 +75,45 @@ export default function TripSummaryScreen({ route, navigation }) {
 
   // Salir sin cobrar: se permite, pero primero se avisa.
   usePreventRemove(Boolean(trip) && !isPaid, ({ data }) => {
-    Alert.alert('Viaje sin cobrar', 'Este viaje queda pendiente de cobro. ¿Quieres salir?', [
-      { text: 'Quedarme', style: 'cancel' },
-      { text: 'Salir', style: 'destructive', onPress: () => navigation.dispatch(data.action) },
+    Alert.alert(t('tripSummary.leaveTitle'), t('tripSummary.leaveMessage'), [
+      { text: t('tripSummary.stay'), style: 'cancel' },
+      { text: t('tripSummary.leave'), style: 'destructive', onPress: () => navigation.dispatch(data.action) },
     ]);
   });
 
   // "Recibí el efectivo": se confirma antes de enviar (no se puede deshacer).
   // useCallback: no se recrea en cada render.
   const handleCollectCash = useCallback(() => {
-    Alert.alert('Cobrar en efectivo', `¿Recibiste ${formatCop(trip.fare)} en efectivo?`, [
-      { text: 'No', style: 'cancel' },
+    Alert.alert(t('tripSummary.cashTitle'), t('tripSummary.cashQuestion', { amount: formatCop(trip.fare) }), [
+      { text: t('common.no'), style: 'cancel' },
       {
-        text: 'Sí, lo recibí',
+        text: t('tripSummary.cashConfirm'),
         onPress: async () => {
           setIsSending(true);
-          setErrorMessage('');
+          setErrorKey(null);
           try {
             await collectCash(trip.id);
           } catch (error) {
-            setErrorMessage(getCashErrorMessage(error));
+            setErrorKey(cashErrorKey(error));
           } finally {
             setIsSending(false);
           }
         },
       },
     ]);
-  }, [trip]);
+  }, [trip, t]);
 
   // Ejecuta una acción de Mercado Pago mostrando carga y error, una a la vez.
   const runPaymentAction = useCallback(async (action) => {
     if (isBusyRef.current) return;
     isBusyRef.current = true;
     setIsSending(true);
-    setErrorMessage('');
-    setInfoMessage('');
+    setErrorKey(null);
+    setInfoKey(null);
     try {
       await action();
     } catch (error) {
-      setErrorMessage(getPaymentErrorMessage(error));
+      setErrorKey(paymentErrorKey(error));
     } finally {
       isBusyRef.current = false;
       setIsSending(false);
@@ -123,7 +124,7 @@ export default function TripSummaryScreen({ route, navigation }) {
   // el viaje como pagado y esta pantalla cambia sola (onSnapshot).
   const verifyPayment = useCallback(async () => {
     const paymentStatus = await verifyMercadoPagoPayment(trip.id);
-    setInfoMessage(getVerifyMessage(paymentStatus));
+    setInfoKey(verifyMessageKey(paymentStatus));
   }, [trip]);
 
   // "Cobrar con Mercado Pago": el backend crea el cobro y la app abre el
@@ -157,9 +158,9 @@ export default function TripSummaryScreen({ route, navigation }) {
   if (!trip) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>No se pudo cargar el resumen de este viaje.</Text>
+        <Text style={styles.error}>{t('tripSummary.loadError')}</Text>
         <Pressable style={[styles.button, styles.primaryButton]} onPress={handleGoHome} accessibilityRole="button">
-          <Text style={styles.primaryText}>Volver al inicio</Text>
+          <Text style={styles.primaryText}>{t('common.backHome')}</Text>
         </Pressable>
       </View>
     );
@@ -170,7 +171,9 @@ export default function TripSummaryScreen({ route, navigation }) {
   // Ya se creó el cobro (el backend dejó paymentStatus en pending): se puede verificar.
   const canVerify = canPayWithMercadoPago && trip.paymentStatus === PAYMENT_STATUS.PENDING;
   const commissionLabel =
-    trip.commissionRate === null ? 'Comisión' : `Comisión (${Math.round(trip.commissionRate * 100)} %)`;
+    trip.commissionRate === null
+      ? t('tripDetail.commission')
+      : t('tripDetail.commissionRate', { rate: Math.round(trip.commissionRate * 100) });
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -179,36 +182,36 @@ export default function TripSummaryScreen({ route, navigation }) {
         accessibilityRole="header"
       >
         <Text style={[styles.bannerText, isPaid ? styles.bannerTextPaid : styles.bannerTextPending]}>
-          {isPaid ? 'Viaje pagado' : 'Viaje por cobrar'}
+          {isPaid ? t('tripSummary.paid') : t('tripSummary.unpaid')}
         </Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Recogida</Text>
+        <Text style={styles.sectionTitle}>{t('tripDetail.pickup')}</Text>
         <Text style={styles.address}>{trip.origin.address}</Text>
-        <Text style={[styles.sectionTitle, styles.spaced]}>Destino</Text>
+        <Text style={[styles.sectionTitle, styles.spaced]}>{t('tripDetail.destination')}</Text>
         <Text style={styles.address}>{trip.destination.address}</Text>
       </View>
 
       <View style={styles.card}>
-        <DetailRow label="Distancia" value={`${trip.distanceKm} km`} />
-        <DetailRow label="Duración" value={`${trip.durationMin} min`} />
-        <DetailRow label="Método de pago" value={paymentMethodLabel(trip.paymentMethod)} />
-        <DetailRow label="Estado del pago" value={paymentStatusLabel(trip.paymentStatus)} />
+        <DetailRow label={t('tripDetail.distance')} value={`${trip.distanceKm} km`} />
+        <DetailRow label={t('tripDetail.duration')} value={`${trip.durationMin} min`} />
+        <DetailRow label={t('tripDetail.paymentMethod')} value={paymentMethodText(t, trip.paymentMethod)} />
+        <DetailRow label={t('tripDetail.paymentStatus')} value={paymentStatusText(t, trip.paymentStatus)} />
       </View>
 
       <View style={styles.card}>
-        <DetailRow label="Tarifa" value={formatCop(trip.fare)} />
+        <DetailRow label={t('tripDetail.fare')} value={formatCop(trip.fare)} />
         <DetailRow label={commissionLabel} value={`- ${formatCop(trip.commission)}`} />
         <View style={styles.divider} />
         <View style={styles.row}>
-          <Text style={styles.earningsLabel}>Tu ganancia</Text>
+          <Text style={styles.earningsLabel}>{t('tripDetail.yourEarnings')}</Text>
           <Text style={styles.earningsValue}>{formatCop(trip.driverEarnings)}</Text>
         </View>
       </View>
 
-      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
-      {infoMessage ? <Text style={styles.info}>{infoMessage}</Text> : null}
+      {errorKey ? <Text style={styles.error}>{t(errorKey)}</Text> : null}
+      {infoKey ? <Text style={styles.info}>{t(infoKey)}</Text> : null}
 
       {canCollectCash ? (
         <Pressable
@@ -216,9 +219,13 @@ export default function TripSummaryScreen({ route, navigation }) {
           onPress={handleCollectCash}
           disabled={isSending}
           accessibilityRole="button"
-          accessibilityLabel={`Recibí el efectivo, ${formatCop(trip.fare)}`}
+          accessibilityLabel={t('tripSummary.cashReceivedLabel', { amount: formatCop(trip.fare) })}
         >
-          {isSending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Recibí el efectivo</Text>}
+          {isSending ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.primaryText}>{t('tripSummary.cashReceived')}</Text>
+          )}
         </Pressable>
       ) : null}
 
@@ -228,9 +235,13 @@ export default function TripSummaryScreen({ route, navigation }) {
           onPress={handlePayWithMercadoPago}
           disabled={isSending}
           accessibilityRole="button"
-          accessibilityLabel={`Cobrar con Mercado Pago, ${formatCop(trip.fare)}`}
+          accessibilityLabel={t('tripSummary.payMercadoPagoLabel', { amount: formatCop(trip.fare) })}
         >
-          {isSending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Cobrar con Mercado Pago</Text>}
+          {isSending ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.primaryText}>{t('tripSummary.payMercadoPago')}</Text>
+          )}
         </Pressable>
       ) : null}
 
@@ -241,7 +252,7 @@ export default function TripSummaryScreen({ route, navigation }) {
           disabled={isSending}
           accessibilityRole="button"
         >
-          <Text style={styles.secondaryText}>Verificar pago</Text>
+          <Text style={styles.secondaryText}>{t('tripSummary.verify')}</Text>
         </Pressable>
       ) : null}
 
@@ -251,7 +262,7 @@ export default function TripSummaryScreen({ route, navigation }) {
         disabled={isSending}
         accessibilityRole="button"
       >
-        <Text style={styles.secondaryText}>Volver al inicio</Text>
+        <Text style={styles.secondaryText}>{t('common.backHome')}</Text>
       </Pressable>
     </ScrollView>
   );

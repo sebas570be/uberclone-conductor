@@ -6,8 +6,6 @@ import {
   parseFinishedTrip,
   getSecondsLeft,
   formatCop,
-  paymentMethodLabel,
-  paymentStatusLabel,
 } from '../tripRequestData';
 
 const CREATED_AT = new Date(2026, 10, 11, 0, 30, 0);
@@ -220,27 +218,5 @@ describe('formatCop', () => {
   test('negativos (saldo) y redondeo', () => {
     expect(formatCop(-3840)).toBe('-$ 3.840');
     expect(formatCop(15359.6)).toBe('$ 15.360');
-  });
-});
-
-describe('paymentMethodLabel', () => {
-  test('texto para el conductor', () => {
-    expect(paymentMethodLabel('cash')).toBe('Efectivo');
-    expect(paymentMethodLabel('mercadopago')).toBe('Mercado Pago');
-    expect(paymentMethodLabel('otro')).toBe('');
-  });
-});
-
-describe('paymentStatusLabel', () => {
-  test('texto del estado del cobro (S4)', () => {
-    expect(paymentStatusLabel('approved')).toBe('Aprobado');
-    expect(paymentStatusLabel('pending')).toBe('Pendiente');
-    expect(paymentStatusLabel('rejected')).toBe('Rechazado');
-    expect(paymentStatusLabel('cash')).toBe('Efectivo');
-  });
-
-  test('sin estado todavía: Pendiente', () => {
-    expect(paymentStatusLabel(null)).toBe('Pendiente');
-    expect(paymentStatusLabel(undefined)).toBe('Pendiente');
   });
 });

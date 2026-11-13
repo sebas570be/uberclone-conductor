@@ -1,5 +1,7 @@
 // src/utils/__tests__/paymentRequest.test.js
-import { PaymentError, isValidCheckoutUrl, getPaymentErrorMessage, getVerifyMessage } from '../paymentRequest';
+// Los mensajes del cobro se prueban en src/i18n/__tests__/labels.test.js
+// (paymentErrorKey y verifyMessageKey).
+import { isValidCheckoutUrl } from '../paymentRequest';
 
 describe('isValidCheckoutUrl', () => {
   test('enlaces https de Mercado Pago: válidos', () => {
@@ -25,28 +27,5 @@ describe('isValidCheckoutUrl', () => {
     expect(isValidCheckoutUrl('')).toBe(false);
     expect(isValidCheckoutUrl(undefined)).toBe(false);
     expect(isValidCheckoutUrl(123)).toBe(false);
-  });
-});
-
-describe('getPaymentErrorMessage', () => {
-  test('mensaje según el tipo de error', () => {
-    expect(getPaymentErrorMessage(new PaymentError('config', ''))).toMatch(/EXPO_PUBLIC_API_URL/);
-    expect(getPaymentErrorMessage(new PaymentError('network', ''))).toMatch(/servidor de pagos/);
-    expect(getPaymentErrorMessage(new PaymentError(401, ''))).toMatch(/sesión/);
-    expect(getPaymentErrorMessage(new PaymentError(409, ''))).toMatch(/ya no se puede cobrar/);
-    expect(getPaymentErrorMessage(new PaymentError(502, ''))).toMatch(/Mercado Pago no respondió/);
-  });
-
-  test('error desconocido: mensaje general', () => {
-    expect(getPaymentErrorMessage(new Error('x'))).toBe('No se pudo completar el cobro. Inténtalo de nuevo.');
-    expect(getPaymentErrorMessage(undefined)).toBe('No se pudo completar el cobro. Inténtalo de nuevo.');
-  });
-});
-
-describe('getVerifyMessage', () => {
-  test('rechazado y pendiente tienen mensaje; aprobado no', () => {
-    expect(getVerifyMessage('rejected')).toMatch(/rechazado/);
-    expect(getVerifyMessage('pending')).toMatch(/Verificar pago/);
-    expect(getVerifyMessage('approved')).toBe('');
   });
 });

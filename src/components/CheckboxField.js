@@ -6,8 +6,12 @@
 import React from 'react';
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { formStyles } from './formStyles';
+import useLanguage from '../hooks/useLanguage';
+import { errorText } from '../i18n/labels';
 
 export default function CheckboxField({ label, checked, onChange, error }) {
+  const { t } = useLanguage();
+
   return (
     <View style={formStyles.field}>
       <Pressable
@@ -25,7 +29,7 @@ export default function CheckboxField({ label, checked, onChange, error }) {
       </Pressable>
       {error ? (
         <Text style={formStyles.errorText} accessibilityLiveRegion="polite">
-          {error}
+          {errorText(t, error)}
         </Text>
       ) : null}
     </View>

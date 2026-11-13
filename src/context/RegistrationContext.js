@@ -7,6 +7,7 @@
 import React, { createContext, useCallback, useMemo, useState } from 'react';
 import { getPersonalDataErrors, getVehicleErrors, getDocumentsErrors } from '../utils/registrationErrors';
 import useSession from '../hooks/useSession';
+import useLanguage from '../hooks/useLanguage';
 
 // Valores iniciales del formulario (las 3 pestañas).
 const INITIAL_FORM = {
@@ -18,7 +19,7 @@ const INITIAL_FORM = {
   phone: '',
   birthDate: null, // Date
   gender: '',
-  language: 'es', // preseleccionado: es el idioma de la app
+  language: 'es', // se reemplaza por el idioma actual de la app (ver abajo)
   // Pestaña 2: vehículo (año y capacidad como texto, igual que en el TextInput)
   category: '',
   plate: '',
@@ -44,9 +45,11 @@ export const RegistrationContext = createContext(null);
 
 export function RegistrationProvider({ children }) {
   const { user } = useSession();
+  const { language } = useLanguage();
   // El correo de Mercado Pago empieza con el de la cuenta, pero se puede cambiar
-  // si el conductor usa otro correo en Mercado Pago.
-  const [form, setForm] = useState(() => ({ ...INITIAL_FORM, mercadoPagoEmail: user?.email ?? '' }));
+  // si el conductor usa otro correo en Mercado Pago. El idioma empieza con el
+  // que ya tiene la app.
+  const [form, setForm] = useState(() => ({ ...INITIAL_FORM, language, mercadoPagoEmail: user?.email ?? '' }));
   // touched[campo] = true cuando el conductor ya salió de ese campo: solo
   // entonces se muestra su error (no se regaña antes de que escriba).
   const [touched, setTouched] = useState({});

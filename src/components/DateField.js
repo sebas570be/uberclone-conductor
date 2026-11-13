@@ -9,6 +9,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import FormField from './FormField';
 import { formStyles } from './formStyles';
 import { formatDate } from '../utils/dates';
+import useLanguage from '../hooks/useLanguage';
 
 export default function DateField({
   label,
@@ -21,6 +22,7 @@ export default function DateField({
   maximumDate,
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const { language, t } = useLanguage();
   const shownDate = value ?? defaultDate;
 
   const close = () => {
@@ -59,10 +61,10 @@ export default function DateField({
         style={[formStyles.input, error && formStyles.inputError]}
         onPress={() => setIsOpen(true)}
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${value ? formatDate(value) : 'sin elegir'}`}
+        accessibilityLabel={`${label}: ${value ? formatDate(value) : t('fields.notSelected')}`}
       >
         <Text style={value ? formStyles.valueText : formStyles.placeholder}>
-          {value ? formatDate(value) : 'Toca para elegir la fecha'}
+          {value ? formatDate(value) : t('fields.datePlaceholder')}
         </Text>
       </Pressable>
 
@@ -76,12 +78,12 @@ export default function DateField({
             onDismiss={handleDismiss}
             minimumDate={minimumDate}
             maximumDate={maximumDate}
-            locale="es-CO" // solo iOS: nombres de los meses en español
+            locale={language === 'en' ? 'en-US' : 'es-CO'} // solo iOS: nombres de los meses en el idioma elegido
             themeVariant="light" // solo iOS: evita letras blancas sobre fondo blanco
           />
           {Platform.OS === 'ios' && (
             <Pressable style={formStyles.doneButton} onPress={handleDone} accessibilityRole="button">
-              <Text style={formStyles.doneText}>Listo</Text>
+              <Text style={formStyles.doneText}>{t('common.done')}</Text>
             </Pressable>
           )}
         </View>

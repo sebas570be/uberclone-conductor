@@ -6,6 +6,7 @@
 // Mientras está Disponible escucha las solicitudes (useTripRequests) y, cuando
 // llega una, abre la pantalla Solicitud. Si hay un viaje activo (aceptado o en
 // curso), no se pone Disponible y abre la pantalla Viaje en curso.
+// Textos en el idioma elegido (useLanguage).
 import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Switch, Pressable, ActivityIndicator, Linking, StyleSheet } from 'react-native';
 import MapView from 'react-native-maps';
@@ -14,6 +15,7 @@ import useSession from '../../hooks/useSession';
 import useDriverLocation, { LOCATION_STATUS } from '../../hooks/useDriverLocation';
 import useTripRequests from '../../hooks/useTripRequests';
 import useActiveTrip from '../../hooks/useActiveTrip';
+import useLanguage from '../../hooks/useLanguage';
 import { getLastAvailability, saveLastAvailability } from '../../services/preferencesService';
 
 // Zoom del mapa (grados visibles): ~1 km a la redonda.
@@ -21,6 +23,7 @@ const MAP_DELTA = { latitudeDelta: 0.01, longitudeDelta: 0.01 };
 
 export default function HomeScreen({ navigation }) {
   const { user } = useSession();
+  const { t } = useLanguage();
   const uid = user?.uid;
   // En el Drawer esta pantalla NO se desmonta al ir a otra: useIsFocused dice
   // si está a la vista, para dejar de enviar la ubicación al salir de Inicio.
@@ -78,7 +81,7 @@ export default function HomeScreen({ navigation }) {
     return (
       <View style={styles.center}>
         <ActivityIndicator size="large" />
-        <Text style={styles.message}>Buscando tu ubicación…</Text>
+        <Text style={styles.message}>{t('home.searching')}</Text>
       </View>
     );
   }
@@ -88,17 +91,15 @@ export default function HomeScreen({ navigation }) {
     return (
       <View style={styles.center}>
         <Text style={styles.message}>
-          {isDenied
-            ? 'Sin permiso de ubicación. Actívalo en los Ajustes del celular para ver el mapa y recibir solicitudes.'
-            : 'No se pudo obtener tu ubicación. Revisa que la ubicación (GPS) esté activada.'}
+          {isDenied ? t('home.permissionDenied') : t('home.locationUnavailable')}
         </Text>
         {isDenied ? (
           <Pressable onPress={() => Linking.openSettings()} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.link}>Abrir Ajustes</Text>
+            <Text style={styles.link}>{t('home.openSettings')}</Text>
           </Pressable>
         ) : null}
         <Pressable onPress={retry} accessibilityRole="button" hitSlop={8}>
-          <Text style={styles.link}>Reintentar</Text>
+          <Text style={styles.link}>{t('home.retry')}</Text>
         </Pressable>
       </View>
     );
@@ -111,24 +112,20 @@ export default function HomeScreen({ navigation }) {
         initialRegion={{ ...position, ...MAP_DELTA }}
         showsUserLocation // punto azul con la ubicación del celular
         followsUserLocation // iOS: el mapa sigue al conductor
-        accessibilityLabel="Mapa con tu ubicación actual"
+        accessibilityLabel={t('home.map')}
       />
 
       <View style={styles.panel}>
         <View style={styles.row}>
           <View style={styles.texts}>
-            <Text style={styles.title}>{isAvailable ? 'Disponible' : 'No disponible'}</Text>
-            <Text style={styles.subtitle}>
-              {isAvailable
-                ? 'Estás compartiendo tu ubicación y puedes recibir solicitudes.'
-                : 'Activa para empezar a recibir solicitudes.'}
-            </Text>
+            <Text style={styles.title}>{isAvailable ? t('home.available') : t('home.unavailable')}</Text>
+            <Text style={styles.subtitle}>{isAvailable ? t('home.availableHint') : t('home.unavailableHint')}</Text>
           </View>
           <Switch
             value={isAvailable}
             onValueChange={handleToggle}
             disabled={!isPreferenceLoaded}
-            accessibilityLabel="Disponible para recibir solicitudes"
+            accessibilityLabel={t('home.switchLabel')}
           />
         </View>
       </View>
