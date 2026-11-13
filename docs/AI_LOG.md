@@ -958,3 +958,157 @@ Ya monté el esqueleto de navegación que revisamos y lo probé en mi iPhone con
   - Una afirmación sobre índices de Firestore se comprueba en la documentación oficial y con una consulta que ya funciona en el proyecto, no se acepta porque suene segura.
   - Un `useMemo` que depende de la fecha actual necesita algo que lo obligue a recalcular (aquí, el día como dependencia); si no, se queda con el valor viejo.
   - Antes de agregar pruebas "que faltan", hay que revisar si ya existen.
+
+### Entrada #17
+
+- **Fecha:** 12/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramientas:** Gemini (Google) para la revisión crítica; Claude (Anthropic) para revisar la respuesta de Gemini.
+- **Objetivo:** Revisar las reglas de Firestore que obligan a una nueva aprobación cuando el conductor cambia su identidad, vehículo o documentos desde el Perfil, y el flujo de la pantalla Editar perfil (marcar No disponible y guardar con estado `pending`) antes de montarlo.
+
+- **Prompt a Gemini (textual, inicio):** "Actúa como revisor de código CRÍTICO de una app React Native (Expo SDK 58, JavaScript, React 19, React Native 0.88, Expo Go en iPhone, Firebase JS SDK 13 con Firestore) y de sus reglas de seguridad de Firestore. Sustenta cada observación con documentación oficial (Firebase Security Rules, Firestore, React, React Native) y di si algo depende de la versión. Si algo está bien, dilo; no propongas cambios por cambiar. Para cada problema da: archivo, línea aproximada, por qué es un problema real (con un caso concreto) y el cambio mínimo." + contexto (estructura de `drivers/{uid}`, aprobación desde la consola, decisiones ya tomadas: celular, correo de Mercado Pago e idioma se guardan directo; foto de perfil, nombre, género, vehículo y documentos vuelven a `pending`; documento de identidad, fecha de nacimiento y correo de la cuenta no se editan; antes de enviar a revisión se marca No disponible; no se envía con un viaje activo), el bloque `drivers` de `firestore.rules`, `REVIEW_FIELDS` y `buildProfileUpdate` de `driverProfile.js`, `updateDriverProfile`, `goOffline` y la lógica de `EditProfileScreen`, y 8 preguntas:
+  1. ¿`request.resource.data.vehicle != resource.data.vehicle` compara los mapas campo por campo, incluidos los Timestamp? ¿Puede salir "distinto" por precisión de milisegundos o microsegundos?
+  2. ¿Un conductor aprobado puede cambiar vehículo, documentos o identidad y seguir `approved`? ¿Puede aprobarse solo? ¿Hay otro camino (borrar y crear) para saltarse la revisión?
+  3. ¿Es correcto exigir documentos vigentes solo al volver a `pending`?
+  4. ¿Hay condición de carrera entre `goOffline` y el envío de ubicación cada 5 s? Si `goOffline` funciona y el guardado falla, ¿qué estado queda?
+  5. ¿Hay problemas si la pantalla se desmonta mientras `submit` está en el `await`?
+  6. ¿Son aceptables las fotos huérfanas en Cloudinary si el guardado es rechazado?
+  7. ¿Es correcto usar `Alert.alert` solo para la confirmación?
+  8. ¿Qué casos probar en el Rules Playground?
+- **Mensaje de aprobación:** "aporbado".
+
+- **Respuesta de Gemini y decisión:**
+  - **Se aceptó:** las reglas impiden aprobarse solo y saltarse la revisión, porque `create` siempre exige `pending` y `delete` solo se permite en `pending`. También se aceptó exigir documentos vigentes solo al volver a `pending`, que las fotos huérfanas en Cloudinary son aceptables en un proyecto académico y el uso de `Alert` solo para la confirmación.
+  - **Se descartó:** el "riesgo crítico" de comparar mapas con `!=` por los nanosegundos de las fechas, y su arreglo de comparar solo la placa y el número de licencia.
+    - Firestore guarda los Timestamp con precisión de microsegundos. Las fechas del documento vienen de un `Date` de JavaScript o de la consola, y la app las reenvía con los mismos milisegundos.
+    - Aunque salieran distintas, no se mandaría a revisión en silencio. La app solo envía `pending` si su propia comparación (`getTime()`) ve un cambio; si la regla viera una diferencia que la app no ve, el guardado sería rechazado con un error visible.
+    - Su arreglo abre un hueco de seguridad: la categoría (que cambia la tarifa), la capacidad, las fotos y los vencimientos podrían cambiar sin revisión.
+  - **Se descartó:** usar `isMountedRef` para evitar un `setState` después de desmontar. React 18 quitó esa advertencia (igual que en la entrada #15). Además, cuando el guardado sale bien no hay `setState` después del `await`; solo hay uno en el `catch`, y si falla la pantalla sigue montada.
+  - **Sin cambios (pregunta 4):** el "cambio mínimo" que propuso Gemini es el mismo código que ya existía. Si `goOffline` funciona y el guardado falla, el conductor queda `approved` y No disponible, con el mensaje de error, y puede reintentar.
+
+- **Archivos y commit:** `firestore.rules` (`changesReviewFields()` y la nueva regla `allow update`), `src/services/availabilityService.js`, `src/navigation/ProfileStack.js`, `src/screens/main/EditProfileScreen.js`, `src/screens/main/ProfileScreen.js`, `src/navigation/MainDrawer.js` (commit `ca54261`).
+
+- **Verificación:**
+  - `npm test`: 127 pruebas pasando.
+  - iPhone, con las reglas nuevas publicadas:
+    - "Editar perfil" se abre con el botón "Atrás".
+    - Una placa inválida (`DSZ33`) muestra el error debajo del campo y deshabilita "Enviar a revisión".
+    - Sin cambios, el botón queda deshabilitado con el aviso "Cambia algún dato para poder enviarlo.".
+    - Al cambiar el color del vehículo aparece la confirmación; después de "Enviar", la app pasa sola a "Pendiente de aprobación".
+    - Al aprobarlo otra vez en la consola, la app vuelve sola al menú.
+
+- **Aprendizaje:**
+  - Una regla de seguridad se justifica por lo que protege: aflojarla para evitar un error que no ocurre abre un hueco real.
+  - La seguridad se exige en el servidor (reglas); la app solo la refleja para que el usuario entienda qué pasa.
+  - El orden importa: hay que marcar No disponible ANTES de perder el permiso de escribir la ubicación.
+
+### Entrada #18
+
+- **Fecha:** 12/11/2026 – 13/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramienta:** Claude (Anthropic).
+- **Objetivo:** Implementar el idioma español / inglés que pide el enunciado (§2 y §3: "Idioma: Español / inglés"; "AsyncStorage solo para preferencias y la sesión (idioma…)"): la infraestructura de traducción, la pantalla Configuración y la traducción de Perfil, Editar perfil, Ganancias, Historial y Detalle del viaje.
+
+- **Prompt / proceso (textual):** Claude propuso las opciones de diseño y yo decidí:
+  - Infraestructura (opción I1: traducción real con un Context propio, sin librerías, y AsyncStorage): "acepto la recomendacion esta super bien y esta ajustada al micro".
+  - Cómo traducir los códigos guardados en Firestore (opción A: la pantalla traduce el código con `t`; las funciones de `utils` siguen trabajando con códigos): "la A (chequea como esta el micro cone so)".
+  - Claude me dio el código; lo revisé, lo aprobé y después se copió a los archivos del proyecto.
+
+- **Resumen de lo generado:**
+  - `src/i18n/translate.js`: función pura `translate(diccionarios, idioma, clave, parámetros)`. Si una clave falta en inglés usa el español, si falta en los dos devuelve la clave, y reemplaza `{nombre}` por el parámetro.
+  - `src/i18n/es.js` y `en.js`: los textos por pantalla, con las mismas claves.
+  - `src/i18n/labels.js`: traduce los códigos guardados (género, categoría, color, método y estado del pago).
+  - `src/context/LanguageContext.js` y `src/hooks/useLanguage.js`: el idioma se lee de AsyncStorage (del celular) y, si no hay, del campo `language` del conductor. Al cambiarlo se guarda en los dos lugares.
+  - `SettingsScreen` (idioma y cerrar sesión), el menú (Drawer) y las pantallas del grupo 1 traducidas con `t(...)`.
+
+- **Qué se usó / modificó / descartó:**
+  - **Se usó:** el patrón de clase Context + hook (igual que el `SessionContext`) y AsyncStorage para la preferencia.
+  - **Se descartó:** pasar `t` a las funciones de `utils` (opción B), porque mezcla la lógica pura con el idioma.
+  - **Alineación con el microcurrículo:** el microcurrículo no menciona la traducción de forma explícita, pero la opción A sigue la "separación por servicios" y las capas (RA-M2: los datos y los servicios guardan códigos y la interfaz los presenta), y el idioma es una "preferencia" (semana 5).
+  - **Pendiente:** los mensajes de validación y los botones de `PhotoField` y `DateField` (compartidos con el registro), y las pantallas de Inicio, solicitud, viaje y cobro.
+
+- **Archivos y commit:** `src/i18n/translate.js`, `es.js`, `en.js`, `labels.js` y sus pruebas, `src/context/LanguageContext.js`, `src/hooks/useLanguage.js`, `src/screens/main/SettingsScreen.js`, `src/navigation/MainDrawer.js`, `App.js`, `src/services/preferencesService.js`, `driverService.js` y `authService.js` (commit `3a97548`). `ProfileScreen`, `EditProfileScreen`, `EarningsScreen`, `HistoryScreen`, `TripDetailScreen`, `ProfileStack` y `HistoryStack` (commit `b782020`). Los archivos del idioma llevan `// AI-assisted: see docs/AI_LOG.md #18`.
+
+- **Verificación:**
+  - `npm test` (commit `3a97548`): 133 pruebas pasando. Incluye una prueba que confirma que `en.js` tiene exactamente las mismas claves que `es.js`.
+  - Se revisó que las 110 claves que usan las pantallas existen en `es.js`.
+  - En el iPhone:
+    - al elegir English, el menú, Settings, Profile, Edit profile, History y Earnings cambian a inglés (*Male*, *Economy*, *White*, *Payment pending*, *Approved*, *Fare*, *Earnings*);
+    - el idioma se mantiene al cerrar y volver a abrir la app;
+    - al volver a Español, todo regresa al español;
+    - después de la medianoche, "Today" en Earnings se recalculó con el día nuevo.
+
+- **Aprendizaje:**
+  - Los datos guardan códigos (`gray`, `cash`) y la interfaz decide el idioma: así cambiar de idioma no toca la base de datos ni la lógica.
+  - Una prueba que compara las claves de los dos diccionarios evita que falte un texto en un idioma.
+  - El código generado por IA se revisa y se prueba en el dispositivo antes de aceptarlo.
+
+### Entrada #19
+
+- **Fecha:** 13/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramienta:** Claude (Anthropic).
+- **Objetivo:** Continuar la traducción español / inglés (enunciado §2 y §3) en el flujo principal del conductor: Inicio (Disponible / No disponible), Solicitud entrante, Viaje en curso y Cobro y resumen, incluidos los mensajes de error del cobro con Mercado Pago.
+
+- **Prompt / proceso (textual):** Seguí el mismo diseño de la entrada #18 (opción A: los datos guardan códigos y la pantalla los traduce con `t`).
+  - "listo sigamos".
+  - "aprobado".
+  - Claude me dio el código; lo revisé, lo aprobé y después se copió a los archivos del proyecto.
+
+- **Resumen de lo generado:**
+  - `src/i18n/es.js` y `en.js`: textos de Inicio, Solicitud, Viaje en curso, Cobro y errores del pago.
+  - `src/i18n/labels.js`:
+    - `paymentErrorKey`: convierte el tipo de error del cobro (sin conexión, sesión vencida, 409, 502…) en la clave del mensaje;
+    - `verifyMessageKey`: da el mensaje que se muestra después de "Verificar pago".
+  - Las 4 pantallas y los títulos del `TripStack` usan `t(...)`. Los errores se guardan como clave y se traducen al mostrarse, así cambian de idioma aunque ya estén en pantalla. También se traducen las confirmaciones (cancelar el viaje, cobrar en efectivo, salir sin cobrar).
+
+- **Qué se usó / modificó / descartó:**
+  - **Se usó:** el mismo patrón de la entrada #18 y las claves que ya existían para recogida, destino, distancia, tarifa y ganancia, para no repetir textos.
+  - **Queda fuera de la app:** la página de pago de Mercado Pago es de Mercado Pago y sale en español (cuenta de Colombia); la app no la controla.
+  - **Pendiente:** el inicio de sesión, el registro, los mensajes de validación, los botones de fotos y fechas, y la pantalla "Pendiente de aprobación".
+
+- **Archivos y commit:** `src/i18n/es.js`, `en.js`, `labels.js` y su prueba, `HomeScreen`, `TripRequestScreen`, `TripInProgressScreen`, `TripSummaryScreen` y `TripStack` (commit `836d3b4`). `es.js`, `en.js` y `labels.js` llevan `// AI-assisted: see docs/AI_LOG.md #18 y #19`.
+
+- **Verificación:**
+  - `npm test`: 138 pruebas pasando, incluidas las de `paymentErrorKey` y `verifyMessageKey` y la que confirma que `en.js` y `es.js` tienen las mismas claves.
+  - En el iPhone, en inglés, con un viaje real creado con `npm run solicitud -- mercadopago`:
+    - *New request*: segundos, *Estimated fare*, *Commission (20%)*, *Your estimated earnings*, *Reject / Accept*;
+    - *Trip in progress*: *Go pick up the passenger*, *Passenger on board*, *Take the passenger to their destination*, *Finish trip*;
+    - *Payment and summary*: *Trip to be paid / Pending*, *Charge with Mercado Pago*; después del pago aprobado en Mercado Pago, *Trip paid / Approved*.
+
+- **Aprendizaje:**
+  - Guardar la clave del mensaje (y no el texto) en el estado permite que un error ya mostrado cambie de idioma.
+  - Lo que muestra un servicio externo (la página de Mercado Pago) no lo controla la app y se documenta como limitación.
+
+### Entrada #20
+
+- **Fecha:** 13/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramienta:** Claude (Anthropic).
+- **Objetivo:** Terminar la traducción español / inglés (enunciado §2 y §3) en lo que faltaba: inicio de sesión, registro (datos personales, vehículo y documentos), mensajes de validación, campos de foto, fecha y listas, botón de cerrar sesión y la pantalla "Pendiente de aprobación".
+
+- **Prompt / proceso (textual):** Seguí el mismo diseño de las entradas #18 y #19 (opción A: los datos guardan códigos y la pantalla los traduce con `t`).
+  - "siguiente y dime con que porcentaje quedamos terminando ese commit".
+  - "aprobado".
+  - Claude me dio el código; lo revisé, lo aprobé y después se copió a los archivos del proyecto.
+
+- **Resumen de lo generado:**
+  - `src/utils/registrationErrors.js`: los errores de validación ya no son frases en español sino `{ key, params }` (por ejemplo `errors.phone`). En la capacidad, la categoría se pasa como clave y se traduce al mostrarla.
+  - `src/i18n/labels.js`:
+    - `errorText`: convierte `{ key, params }` en el texto del idioma actual;
+    - `translatedOptions`: listas desplegables con el texto en el idioma (el valor guardado sigue siendo el código).
+  - `FormField` y `CheckboxField` traducen el error en un solo lugar. `PhotoField`, `DateField` (fecha en formato `es-CO` o `en-US`), `SelectField` y `SignOutButton` usan `t(...)`.
+  - Inicio de sesión: los códigos de error de Firebase se convierten en claves. Registro: el selector de Idioma cambia la app al instante. Nueva `PendingScreen` con su mensaje. El idioma inicial del registro es el de la app.
+
+- **Qué se usó / modificó / descartó:**
+  - **Se usó:** el patrón de las entradas #18 y #19 y las mismas validaciones del registro; solo cambió el formato del error, no las reglas.
+  - **Pendiente:** quedaron sin uso las funciones viejas con mensajes en español (servicios y utilidades); se quitan en un commit de limpieza aparte.
+
+- **Archivos y commit:** `registrationErrors.js` y su prueba, `es.js`, `en.js`, `labels.js` y su prueba, `FormField`, `CheckboxField`, `PhotoField`, `DateField`, `SelectField`, `SignOutButton`, `LoginScreen`, `PersonalDataScreen`, `VehicleScreen`, `DocumentsScreen`, `PendingScreen`, `RegisterTabs`, `RootNavigator`, `RegistrationContext`, `SessionContext` y `EditProfileScreen` (commit `ce94bce`). `es.js`, `en.js` y `labels.js` llevan `// AI-assisted: see docs/AI_LOG.md #18, #19 y #20`.
+
+- **Verificación:**
+  - `npm test`: 140 pruebas pasando, incluidas las de `errorText` y `translatedOptions`, las de `registrationErrors` (mismos mensajes en español y uno en inglés) y la que confirma que `en.js` y `es.js` tienen las mismas claves.
+  - Se revisó que todas las claves usadas existan en los dos idiomas y que no quede texto de interfaz en español fuera de `src/i18n`.
+  
+- **Aprendizaje:**
+  - Si la validación devuelve una clave con parámetros en vez de una frase, la misma regla sirve para los dos idiomas y la prueba no depende del texto.

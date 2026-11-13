@@ -91,6 +91,15 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - **Detalle del viaje:** ruta dibujada con `Polyline` desde la ruta guardada del viaje, distancia, duración, tarifa, comisión, propina y ganancia. La calificación aparece como "Sin calificación" porque no hay app del pasajero que califique.
 - Los viajes cancelados o rechazados no aparecen: no cobran nada.
 
+## Perfil, configuración e idioma
+
+- **Perfil:** muestra los datos personales, el vehículo y los documentos; un documento vencido se ve en rojo. El celular y el correo de Mercado Pago se guardan directo, con las mismas validaciones del registro, y el conductor sigue aprobado.
+- **Cambios que requieren una nueva aprobación:** la foto, el nombre, el género, el vehículo y los documentos se comparan con los documentos, así que se editan en "Editar identidad, vehículo o documentos". Antes de enviar se pide confirmación; el conductor queda No disponible y el registro vuelve a "Pendiente de aprobación" hasta que lo aprueben de nuevo (en la consola de Firebase). No se puede enviar con un viaje activo. El documento de identidad y la fecha de nacimiento no se pueden cambiar.
+- **Reglas de Firestore:** si cambia algún dato de revisión, el único estado permitido es `pending`, y con documentos vigentes. Una app modificada no puede cambiar esos datos y seguir aprobada.
+- **Idioma (español / inglés):** sin librerías, en `src/i18n` (`es.js`, `en.js` y `translate`). Se elige en Configuración o en el registro y cambia la app al instante. Se guarda en el celular (AsyncStorage) y en la cuenta (`drivers.language`). Firestore guarda códigos (`'gray'`, `'cash'`) y cada pantalla los traduce; los errores se guardan como clave, así un mensaje ya mostrado también cambia de idioma. Una prueba verifica que `es.js` y `en.js` tengan las mismas claves.
+- **Cerrar sesión:** desde el menú o desde Configuración; primero se marca No disponible y después se cierra la sesión.
+- **Limitación:** la página de pago de Mercado Pago sale en español (cuenta de Colombia); la controla Mercado Pago, no la app.
+
 ## Estado del desarrollo
 
 - [x] Arquitectura por capas
@@ -103,6 +112,7 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - [x] Navegación al punto de recogida y al destino
 - [x] Cobro con Mercado Pago y en efectivo
 - [x] Historial y resumen de ganancias
+- [x] Perfil, configuración e idioma (español / inglés)
 
 ## Uso de IA
 
