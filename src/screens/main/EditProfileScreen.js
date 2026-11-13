@@ -5,6 +5,8 @@
 // "Pendiente de aprobación". Las reglas de Firestore también lo exigen: una
 // app modificada no puede cambiar estos datos y seguir aprobada.
 // Mismos campos y validaciones del registro (registrationErrors).
+// Textos en el idioma elegido (useLanguage). Los mensajes de validación y los
+// textos de PhotoField/DateField se traducen con el registro.
 import React, { useMemo, useState } from 'react';
 import { ScrollView, View, Text, Pressable, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import TextField from '../../components/TextField';
@@ -14,7 +16,9 @@ import PhotoField from '../../components/PhotoField';
 import { formStyles } from '../../components/formStyles';
 import useSession from '../../hooks/useSession';
 import useActiveTrip from '../../hooks/useActiveTrip';
-import { GENDER_OPTIONS, CATEGORY_OPTIONS, COLOR_OPTIONS, labelFor } from '../../constants/registrationOptions';
+import useLanguage from '../../hooks/useLanguage';
+import { GENDER_OPTIONS, CATEGORY_OPTIONS, COLOR_OPTIONS } from '../../constants/registrationOptions';
+import { optionLabel } from '../../i18n/labels';
 import { REGISTRATION_RULES } from '../../config/registration';
 import {
   getPersonalDataErrors,
@@ -33,22 +37,25 @@ const tomorrow = () => {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + 1);
 };
 
-function saveErrorMessage(error) {
+// Devuelve la CLAVE del mensaje (la pantalla lo traduce con t).
+function saveErrorKey(error) {
   // Sin internet, fetch lanza TypeError; Firestore usa el código "unavailable".
-  if (error instanceof TypeError || error?.code === 'unavailable') {
-    return 'Sin conexión. Revisa tu internet e intenta de nuevo.';
-  }
-  if (error?.code === 'photo-upload-failed') {
-    return 'No se pudieron subir las fotos. Revisa tu internet e intenta de nuevo.';
-  }
-  return 'No se pudieron enviar los cambios. Intenta de nuevo.';
+  if (error instanceof TypeError || error?.code === 'unavailable') return 'common.offlineError';
+  if (error?.code === 'photo-upload-failed') return 'editProfile.photoError';
+  return 'editProfile.saveError';
 }
+
+// Opciones de una lista con el texto en el idioma actual (el valor guardado
+// sigue siendo el código).
+const translatedOptions = (t, options, group) =>
+  options.map((option) => ({ value: option.value, label: optionLabel(t, group, option.value) }));
 
 function EditProfileForm({ user, driver }) {
   const { activeTrip } = useActiveTrip();
+  const { t } = useLanguage();
   const [form, setForm] = useState(() => profileFormFromDriver(driver));
   const [isSaving, setIsSaving] = useState(false);
-  const [saveError, setSaveError] = useState(null);
+  const [saveError, setSaveError] = useState(null); // clave del texto del error
 
   const setField = (name, value) => {
     setForm((current) => ({ ...current, [name]: value }));
@@ -84,7 +91,7 @@ function EditProfileForm({ user, driver }) {
       await updateDriverProfile(user.uid, driver, form);
     } catch (error) {
       console.log('Error al enviar los cambios a revisión:', error?.code, error?.message);
-      setSaveError(saveErrorMessage(error));
+      setSaveError(saveErrorKey(error));
       setIsSaving(false);
     }
   };
@@ -92,14 +99,10 @@ function EditProfileForm({ user, driver }) {
   // Confirmación antes de enviar: la consecuencia (quedar sin viajes) es seria.
   const handleSubmit = () => {
     if (!canSubmit) return;
-    Alert.alert(
-      'Enviar cambios a revisión',
-      'Estos cambios requieren una nueva aprobación. Quedarás No disponible y no podrás recibir viajes hasta que te aprueben.',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        { text: 'Enviar', style: 'destructive', onPress: submit },
-      ]
-    );
+    Alert.alert(t('editProfile.confirmTitle'), t('editProfile.confirmMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('editProfile.confirm'), style: 'destructive', onPress: submit },
+    ]);
   };
 
   return (
@@ -110,19 +113,17 @@ function EditProfileForm({ user, driver }) {
       keyboardDismissMode="on-drag"
       automaticallyAdjustKeyboardInsets
     >
-      <Text style={styles.notice}>
-        Al enviar cualquiera de estos cambios, tu registro vuelve a "Pendiente de aprobación".
-      </Text>
+      <Text style={styles.notice}>{t('editProfile.notice')}</Text>
 
-      <Text style={styles.sectionTitle}>Identidad</Text>
+      <Text style={styles.sectionTitle}>{t('editProfile.identity')}</Text>
       <PhotoField
-        label="Foto de perfil"
+        label={t('fields.profilePhoto')}
         value={form.profilePhoto}
         onChange={(uri) => setField('profilePhoto', uri)}
         error={errors.profilePhoto}
       />
       <TextField
-        label="Nombre completo"
+        label={t('fields.fullName')}
         value={form.fullName}
         onChangeText={(text) => setField('fullName', text)}
         error={errors.fullName}
@@ -131,24 +132,24 @@ function EditProfileForm({ user, driver }) {
         autoComplete="name"
       />
       <SelectField
-        label="Género"
+        label={t('fields.gender')}
         value={form.gender}
-        options={GENDER_OPTIONS}
+        options={translatedOptions(t, GENDER_OPTIONS, 'gender')}
         onChange={(value) => setField('gender', value)}
         error={errors.gender}
       />
 
-      <Text style={styles.sectionTitle}>Vehículo</Text>
+      <Text style={styles.sectionTitle}>{t('profile.vehicle')}</Text>
       <SelectField
-        label="Categoría"
+        label={t('fields.category')}
         value={form.category}
-        options={CATEGORY_OPTIONS}
+        options={translatedOptions(t, CATEGORY_OPTIONS, 'category')}
         onChange={(value) => setField('category', value)}
         error={errors.category}
       />
       {/* Igual que en el registro: mayúsculas ANTES de validar. */}
       <TextField
-        label="Placa"
+        label={t('fields.plate')}
         value={form.plate}
         onChangeText={(text) => setField('plate', normalizePlate(text))}
         error={errors.plate}
@@ -157,7 +158,7 @@ function EditProfileForm({ user, driver }) {
         maxLength={6}
       />
       <TextField
-        label="Marca"
+        label={t('fields.brand')}
         value={form.brand}
         onChangeText={(text) => setField('brand', text)}
         error={errors.brand}
@@ -165,7 +166,7 @@ function EditProfileForm({ user, driver }) {
         autoCapitalize="words"
       />
       <TextField
-        label="Modelo"
+        label={t('fields.model')}
         value={form.model}
         onChangeText={(text) => setField('model', text)}
         error={errors.model}
@@ -173,7 +174,7 @@ function EditProfileForm({ user, driver }) {
         autoCapitalize="words"
       />
       <TextField
-        label="Año"
+        label={t('fields.year')}
         value={form.year}
         onChangeText={(text) => setField('year', text)}
         error={errors.year}
@@ -181,36 +182,39 @@ function EditProfileForm({ user, driver }) {
         maxLength={4}
       />
       <SelectField
-        label="Color"
+        label={t('fields.color')}
         value={form.color}
-        options={COLOR_OPTIONS}
+        options={translatedOptions(t, COLOR_OPTIONS, 'color')}
         onChange={(value) => setField('color', value)}
         error={errors.color}
       />
       <TextField
-        label="Capacidad (pasajeros)"
+        label={t('editProfile.capacity')}
         value={form.capacity}
         onChangeText={(text) => setField('capacity', text)}
         error={errors.capacity}
         hint={
           minimumCapacity === undefined
             ? undefined
-            : `Mínimo ${minimumCapacity} para ${labelFor(CATEGORY_OPTIONS, form.category)}.`
+            : t('editProfile.capacityHint', {
+                min: minimumCapacity,
+                category: optionLabel(t, 'category', form.category),
+              })
         }
         keyboardType="number-pad"
         maxLength={2}
       />
       <PhotoField
-        label="Foto del vehículo"
-        hint="Debe verse la placa."
+        label={t('fields.vehiclePhoto')}
+        hint={t('editProfile.vehiclePhotoHint')}
         value={form.vehiclePhoto}
         onChange={(uri) => setField('vehiclePhoto', uri)}
         error={errors.vehiclePhoto}
       />
 
-      <Text style={styles.sectionTitle}>Documentos</Text>
+      <Text style={styles.sectionTitle}>{t('profile.documents')}</Text>
       <TextField
-        label="Número de licencia de conducción"
+        label={t('editProfile.licenseNumber')}
         value={form.licenseNumber}
         onChangeText={(text) => setField('licenseNumber', text)}
         error={errors.licenseNumber}
@@ -218,7 +222,7 @@ function EditProfileForm({ user, driver }) {
         maxLength={10}
       />
       <DateField
-        label="Vencimiento de la licencia"
+        label={t('editProfile.licenseExpiry')}
         value={form.licenseExpiry}
         onChange={(date) => setField('licenseExpiry', date)}
         error={errors.licenseExpiry}
@@ -226,13 +230,13 @@ function EditProfileForm({ user, driver }) {
         minimumDate={tomorrow()}
       />
       <PhotoField
-        label="Foto de la licencia"
+        label={t('editProfile.licensePhoto')}
         value={form.licensePhoto}
         onChange={(uri) => setField('licensePhoto', uri)}
         error={errors.licensePhoto}
       />
       <DateField
-        label="Vencimiento del SOAT"
+        label={t('editProfile.soatExpiry')}
         value={form.soatExpiry}
         onChange={(date) => setField('soatExpiry', date)}
         error={errors.soatExpiry}
@@ -240,7 +244,7 @@ function EditProfileForm({ user, driver }) {
         minimumDate={tomorrow()}
       />
       <PhotoField
-        label="Foto del SOAT"
+        label={t('editProfile.soatPhoto')}
         value={form.soatPhoto}
         onChange={(uri) => setField('soatPhoto', uri)}
         error={errors.soatPhoto}
@@ -248,7 +252,7 @@ function EditProfileForm({ user, driver }) {
       {needsTechnicalReview ? (
         <>
           <DateField
-            label="Vencimiento de la revisión técnico-mecánica"
+            label={t('editProfile.technicalReviewExpiry')}
             value={form.technicalReviewExpiry}
             onChange={(date) => setField('technicalReviewExpiry', date)}
             error={errors.technicalReviewExpiry}
@@ -256,7 +260,7 @@ function EditProfileForm({ user, driver }) {
             minimumDate={tomorrow()}
           />
           <PhotoField
-            label="Foto de la revisión técnico-mecánica"
+            label={t('editProfile.technicalReviewPhoto')}
             value={form.technicalReviewPhoto}
             onChange={(uri) => setField('technicalReviewPhoto', uri)}
             error={errors.technicalReviewPhoto}
@@ -264,19 +268,16 @@ function EditProfileForm({ user, driver }) {
         </>
       ) : (
         <Text style={formStyles.hint}>
-          Revisión técnico-mecánica: no aplica, tu vehículo tiene menos de{' '}
-          {REGISTRATION_RULES.technicalReviewAfterYears} años.
+          {t('editProfile.technicalReviewNotNeeded', { years: REGISTRATION_RULES.technicalReviewAfterYears })}
         </Text>
       )}
 
       {activeTrip ? (
-        <Text style={[formStyles.errorText, styles.center]}>
-          Tienes un viaje activo: termínalo antes de enviar cambios a revisión.
-        </Text>
+        <Text style={[formStyles.errorText, styles.center]}>{t('editProfile.activeTrip')}</Text>
       ) : null}
       {saveError ? (
         <Text style={[formStyles.errorText, styles.center]} accessibilityLiveRegion="polite">
-          {saveError}
+          {t(saveError)}
         </Text>
       ) : null}
 
@@ -288,13 +289,13 @@ function EditProfileForm({ user, driver }) {
         accessibilityState={{ disabled: !canSubmit }}
       >
         {isSaving ? (
-          <ActivityIndicator color="#FFFFFF" accessibilityLabel="Subiendo fotos y enviando los cambios" />
+          <ActivityIndicator color="#FFFFFF" accessibilityLabel={t('editProfile.submitting')} />
         ) : (
-          <Text style={formStyles.primaryButtonText}>Enviar a revisión</Text>
+          <Text style={formStyles.primaryButtonText}>{t('editProfile.submit')}</Text>
         )}
       </Pressable>
       {!needsReview && !isSaving ? (
-        <Text style={[formStyles.hint, styles.center]}>Cambia algún dato para poder enviarlo.</Text>
+        <Text style={[formStyles.hint, styles.center]}>{t('editProfile.noChanges')}</Text>
       ) : null}
     </ScrollView>
   );

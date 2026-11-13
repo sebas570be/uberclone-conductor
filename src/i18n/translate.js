@@ -3,6 +3,7 @@
 // sin librerías: busca la clave ('drawer.history') en el diccionario del
 // idioma; si falta, usa el español; si tampoco está, devuelve la clave (así
 // se nota en pantalla qué texto falta). {nombre} se reemplaza por params.nombre.
+// AI-assisted: see docs/AI_LOG.md #18
 import es from './es';
 import en from './en';
 

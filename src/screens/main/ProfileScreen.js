@@ -4,12 +4,15 @@
 // comparan con ningún documento). La identidad, el vehículo y los documentos se
 // editan en EditProfileScreen (requieren una nueva aprobación). Los datos salen
 // del SessionContext, que ya escucha drivers/{uid} en tiempo real.
+// Textos en el idioma elegido (useLanguage). Los mensajes de validación todavía
+// salen de registrationErrors (se traducen con el registro).
 import React, { useMemo, useState } from 'react';
 import { ScrollView, View, Text, Image, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import TextField from '../../components/TextField';
 import { formStyles } from '../../components/formStyles';
 import useSession from '../../hooks/useSession';
-import { GENDER_OPTIONS, CATEGORY_OPTIONS, COLOR_OPTIONS, labelFor } from '../../constants/registrationOptions';
+import useLanguage from '../../hooks/useLanguage';
+import { optionLabel } from '../../i18n/labels';
 import { getPersonalDataErrors, getDocumentsErrors } from '../../utils/registrationErrors';
 import { isFutureDate } from '../../utils/validators';
 import { profileFormFromDriver, buildProfileUpdate } from '../../utils/driverProfile';
@@ -26,26 +29,27 @@ function InfoRow({ label, value, isWarning = false }) {
 }
 
 // Fecha de vencimiento; si ya pasó, se avisa en rojo.
-function ExpiryRow({ label, date }) {
-  if (!date) return <InfoRow label={label} value="No aplica" />;
+function ExpiryRow({ label, date, t }) {
+  if (!date) return <InfoRow label={label} value={t('profile.notApplicable')} />;
   const isExpired = !isFutureDate(date);
-  return <InfoRow label={label} value={`${formatDate(date)}${isExpired ? ' · Vencido' : ''}`} isWarning={isExpired} />;
+  const value = isExpired ? `${formatDate(date)} · ${t('profile.expired')}` : formatDate(date);
+  return <InfoRow label={label} value={value} isWarning={isExpired} />;
 }
 
-function saveErrorMessage(error) {
+// Devuelve la CLAVE del mensaje (la pantalla lo traduce con t).
+function saveErrorKey(error) {
   // Sin internet, fetch lanza TypeError; Firestore usa el código "unavailable".
-  if (error instanceof TypeError || error?.code === 'unavailable') {
-    return 'Sin conexión. Revisa tu internet e intenta de nuevo.';
-  }
-  return 'No se pudieron guardar los cambios. Intenta de nuevo.';
+  if (error instanceof TypeError || error?.code === 'unavailable') return 'common.offlineError';
+  return 'profile.saveError';
 }
 
 // El formulario se monta solo cuando ya están los datos del conductor: así el
 // estado inicial (useState) siempre parte del documento guardado.
 function ProfileForm({ user, driver, onEdit }) {
+  const { t } = useLanguage();
   const [form, setForm] = useState(() => profileFormFromDriver(driver));
   const [isSaving, setIsSaving] = useState(false);
-  const [message, setMessage] = useState(null); // { text, isError }
+  const [message, setMessage] = useState(null); // { key, isError }: key = clave del texto
 
   const setField = (name, value) => {
     setForm((current) => ({ ...current, [name]: value }));
@@ -75,10 +79,10 @@ function ProfileForm({ user, driver, onEdit }) {
     setMessage(null);
     try {
       await updateDriverProfile(user.uid, driver, form);
-      setMessage({ text: 'Cambios guardados.', isError: false });
+      setMessage({ key: 'profile.saved', isError: false });
     } catch (error) {
       console.log('Error al guardar el perfil:', error?.code, error?.message);
-      setMessage({ text: saveErrorMessage(error), isError: true });
+      setMessage({ key: saveErrorKey(error), isError: true });
     } finally {
       setIsSaving(false);
     }
@@ -95,18 +99,18 @@ function ProfileForm({ user, driver, onEdit }) {
       automaticallyAdjustKeyboardInsets
     >
       <View style={styles.header}>
-        <Image source={{ uri: personal.photoUrl }} style={styles.avatar} accessibilityLabel="Foto de perfil" />
+        <Image source={{ uri: personal.photoUrl }} style={styles.avatar} accessibilityLabel={t('fields.profilePhoto')} />
         <Text style={styles.name}>{personal.fullName}</Text>
         <Text style={styles.email}>{user.email}</Text>
       </View>
 
-      <Text style={styles.sectionTitle}>Datos personales</Text>
+      <Text style={styles.sectionTitle}>{t('profile.personalData')}</Text>
       <View style={styles.card}>
-        <InfoRow label="Documento" value={personal.documentNumber} />
-        <InfoRow label="Fecha de nacimiento" value={formatDate(form.birthDate)} />
-        <InfoRow label="Género" value={labelFor(GENDER_OPTIONS, personal.gender)} />
+        <InfoRow label={t('fields.documentNumber')} value={personal.documentNumber} />
+        <InfoRow label={t('fields.birthDate')} value={formatDate(form.birthDate)} />
+        <InfoRow label={t('fields.gender')} value={optionLabel(t, 'gender', personal.gender)} />
         <TextField
-          label="Celular"
+          label={t('fields.phone')}
           value={form.phone}
           onChangeText={(text) => setField('phone', text)}
           error={errors.phone}
@@ -116,29 +120,33 @@ function ProfileForm({ user, driver, onEdit }) {
         />
       </View>
 
-      <Text style={styles.sectionTitle}>Vehículo</Text>
+      <Text style={styles.sectionTitle}>{t('profile.vehicle')}</Text>
       <View style={styles.card}>
-        <Image source={{ uri: vehicle.photoUrl }} style={styles.vehiclePhoto} accessibilityLabel="Foto del vehículo" />
-        <InfoRow label="Categoría" value={labelFor(CATEGORY_OPTIONS, vehicle.category)} />
-        <InfoRow label="Placa" value={vehicle.plate} />
-        <InfoRow label="Marca y modelo" value={`${vehicle.brand} ${vehicle.model}`} />
-        <InfoRow label="Año" value={String(vehicle.year)} />
-        <InfoRow label="Color" value={labelFor(COLOR_OPTIONS, vehicle.color)} />
-        <InfoRow label="Capacidad" value={`${vehicle.capacity} pasajeros`} />
+        <Image
+          source={{ uri: vehicle.photoUrl }}
+          style={styles.vehiclePhoto}
+          accessibilityLabel={t('fields.vehiclePhoto')}
+        />
+        <InfoRow label={t('fields.category')} value={optionLabel(t, 'category', vehicle.category)} />
+        <InfoRow label={t('fields.plate')} value={vehicle.plate} />
+        <InfoRow label={t('profile.brandModel')} value={`${vehicle.brand} ${vehicle.model}`} />
+        <InfoRow label={t('fields.year')} value={String(vehicle.year)} />
+        <InfoRow label={t('fields.color')} value={optionLabel(t, 'color', vehicle.color)} />
+        <InfoRow label={t('profile.capacity')} value={t('profile.passengers', { count: vehicle.capacity })} />
       </View>
 
-      <Text style={styles.sectionTitle}>Documentos</Text>
+      <Text style={styles.sectionTitle}>{t('profile.documents')}</Text>
       <View style={styles.card}>
-        <InfoRow label="Licencia" value={documents.licenseNumber} />
-        <ExpiryRow label="Vence la licencia" date={form.licenseExpiry} />
-        <ExpiryRow label="Vence el SOAT" date={form.soatExpiry} />
-        <ExpiryRow label="Vence la revisión técnico-mecánica" date={form.technicalReviewExpiry} />
+        <InfoRow label={t('profile.license')} value={documents.licenseNumber} />
+        <ExpiryRow label={t('profile.licenseExpiry')} date={form.licenseExpiry} t={t} />
+        <ExpiryRow label={t('profile.soatExpiry')} date={form.soatExpiry} t={t} />
+        <ExpiryRow label={t('profile.technicalReviewExpiry')} date={form.technicalReviewExpiry} t={t} />
       </View>
 
-      <Text style={styles.sectionTitle}>Pagos</Text>
+      <Text style={styles.sectionTitle}>{t('profile.payments')}</Text>
       <View style={styles.card}>
         <TextField
-          label="Correo de Mercado Pago"
+          label={t('fields.mercadoPagoEmail')}
           value={form.mercadoPagoEmail}
           onChangeText={(text) => setField('mercadoPagoEmail', text)}
           error={errors.mercadoPagoEmail}
@@ -150,7 +158,7 @@ function ProfileForm({ user, driver, onEdit }) {
 
       {message ? (
         <Text style={[styles.message, message.isError && styles.warning]} accessibilityLiveRegion="polite">
-          {message.text}
+          {t(message.key)}
         </Text>
       ) : null}
 
@@ -164,14 +172,14 @@ function ProfileForm({ user, driver, onEdit }) {
         {isSaving ? (
           <ActivityIndicator color="#FFFFFF" />
         ) : (
-          <Text style={formStyles.primaryButtonText}>Guardar cambios</Text>
+          <Text style={formStyles.primaryButtonText}>{t('profile.save')}</Text>
         )}
       </Pressable>
 
       <Pressable style={formStyles.secondaryButton} onPress={onEdit} accessibilityRole="button">
-        <Text style={formStyles.secondaryButtonText}>Editar identidad, vehículo o documentos</Text>
+        <Text style={formStyles.secondaryButtonText}>{t('profile.edit')}</Text>
       </Pressable>
-      <Text style={[formStyles.hint, styles.editHint]}>Esos cambios requieren una nueva aprobación.</Text>
+      <Text style={[formStyles.hint, styles.editHint]}>{t('profile.editHint')}</Text>
     </ScrollView>
   );
 }

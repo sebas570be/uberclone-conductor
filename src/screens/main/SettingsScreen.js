@@ -2,6 +2,7 @@
 // Configuración (enunciado §3.7: idioma y cierre de sesión).
 // El idioma se guarda en el celular (AsyncStorage) y en la cuenta (Firestore)
 // a través del LanguageContext. Cerrar sesión usa la misma función del menú.
+// AI-assisted: see docs/AI_LOG.md #18
 import React, { useState } from 'react';
 import { ScrollView, View, Text, Pressable, StyleSheet } from 'react-native';
 import { formStyles } from '../../components/formStyles';

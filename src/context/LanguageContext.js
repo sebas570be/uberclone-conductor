@@ -6,6 +6,7 @@
 // - Si el celular no tiene ninguno (por ejemplo, otro celular): el del
 //   registro del conductor (campo language en Firestore).
 // - Al cambiarlo en Configuración: se guarda en los dos lugares.
+// AI-assisted: see docs/AI_LOG.md #18
 import React, { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import useSession from '../hooks/useSession';
 import { DICTIONARIES, DEFAULT_LANGUAGE, isSupportedLanguage, translate } from '../i18n/translate';

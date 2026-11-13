@@ -4,20 +4,27 @@
 // la edición usa el del Stack (con el botón de atrás), igual que el Historial.
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import useLanguage from '../hooks/useLanguage';
 import ProfileScreen from '../screens/main/ProfileScreen';
 import EditProfileScreen from '../screens/main/EditProfileScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function ProfileStack() {
+  const { t } = useLanguage();
+
   return (
     <Stack.Navigator>
       {/* title: iOS lo usa en el botón de volver si no hay headerBackTitle. */}
-      <Stack.Screen name="ProfileHome" component={ProfileScreen} options={{ headerShown: false, title: 'Perfil' }} />
+      <Stack.Screen
+        name="ProfileHome"
+        component={ProfileScreen}
+        options={{ headerShown: false, title: t('drawer.profile') }}
+      />
       <Stack.Screen
         name="EditProfile"
         component={EditProfileScreen}
-        options={{ title: 'Editar perfil', headerBackTitle: 'Atrás' }}
+        options={{ title: t('editProfile.title'), headerBackTitle: t('common.back') }}
       />
     </Stack.Navigator>
   );

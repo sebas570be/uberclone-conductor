@@ -3,16 +3,19 @@
 // comisiones, propinas, ganancia neta y promedio por viaje de hoy, la semana o
 // el mes, y el saldo con la plataforma. Solo cuentan los viajes PAGADOS
 // (dinero real); los que quedaron sin pagar se muestran aparte.
+// Textos en el idioma elegido (useLanguage).
 import React, { useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import useEarnings from '../../hooks/useEarnings';
+import useLanguage from '../../hooks/useLanguage';
 import { PERIOD } from '../../config/history';
 import { formatCop } from '../../utils/tripRequestData';
 
+// labelKey: clave del texto en src/i18n.
 const PERIOD_OPTIONS = [
-  { value: PERIOD.TODAY, label: 'Hoy' },
-  { value: PERIOD.WEEK, label: 'Semana' },
-  { value: PERIOD.MONTH, label: 'Mes' },
+  { value: PERIOD.TODAY, labelKey: 'periods.today' },
+  { value: PERIOD.WEEK, labelKey: 'periods.week' },
+  { value: PERIOD.MONTH, labelKey: 'periods.month' },
 ];
 
 function DetailRow({ label, value }) {
@@ -27,6 +30,7 @@ function DetailRow({ label, value }) {
 export default function EarningsScreen() {
   const [period, setPeriod] = useState(PERIOD.TODAY);
   const { summary, balance, isLoading, hasError } = useEarnings(period);
+  const { t } = useLanguage();
 
   if (isLoading) {
     return (
@@ -39,7 +43,7 @@ export default function EarningsScreen() {
   if (hasError) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>No se pudieron cargar tus ganancias. Revisa tu conexión.</Text>
+        <Text style={styles.error}>{t('earnings.loadError')}</Text>
       </View>
     );
   }
@@ -59,46 +63,43 @@ export default function EarningsScreen() {
               accessibilityRole="tab"
               accessibilityState={{ selected: isSelected }}
             >
-              <Text style={[styles.periodText, isSelected && styles.periodTextSelected]}>{option.label}</Text>
+              <Text style={[styles.periodText, isSelected && styles.periodTextSelected]}>{t(option.labelKey)}</Text>
             </Pressable>
           );
         })}
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Ganancia neta</Text>
+        <Text style={styles.sectionTitle}>{t('earnings.netEarnings')}</Text>
         <Text style={styles.bigValue}>{formatCop(summary.netEarnings)}</Text>
         <View style={styles.divider} />
-        <DetailRow label="Viajes pagados" value={String(summary.tripCount)} />
-        <DetailRow label="Total facturado" value={formatCop(summary.totalFare)} />
-        <DetailRow label="Comisiones" value={`- ${formatCop(summary.totalCommission)}`} />
-        <DetailRow label="Propinas" value={formatCop(summary.totalTips)} />
-        <DetailRow label="Promedio por viaje" value={formatCop(summary.averagePerTrip)} />
-        {summary.tripCount === 0 ? <Text style={styles.empty}>No hay viajes pagados en este periodo.</Text> : null}
+        <DetailRow label={t('earnings.paidTrips')} value={String(summary.tripCount)} />
+        <DetailRow label={t('earnings.totalFare')} value={formatCop(summary.totalFare)} />
+        <DetailRow label={t('earnings.commissions')} value={`- ${formatCop(summary.totalCommission)}`} />
+        <DetailRow label={t('earnings.tips')} value={formatCop(summary.totalTips)} />
+        <DetailRow label={t('earnings.average')} value={formatCop(summary.averagePerTrip)} />
+        {summary.tripCount === 0 ? <Text style={styles.empty}>{t('earnings.empty')}</Text> : null}
       </View>
 
       {summary.pending.tripCount > 0 ? (
         <View style={[styles.card, styles.pendingCard]}>
           <Text style={styles.pendingText}>
-            Pendiente de pago: {summary.pending.tripCount} {summary.pending.tripCount === 1 ? 'viaje' : 'viajes'} ·{' '}
-            {formatCop(summary.pending.amount)}
+            {t(summary.pending.tripCount === 1 ? 'earnings.pendingOne' : 'earnings.pendingMany', {
+              count: summary.pending.tripCount,
+              amount: formatCop(summary.pending.amount),
+            })}
           </Text>
-          <Text style={styles.note}>No se suma a tus ganancias hasta que se pague.</Text>
+          <Text style={styles.note}>{t('earnings.pendingNote')}</Text>
         </View>
       ) : null}
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Saldo con la plataforma</Text>
+        <Text style={styles.sectionTitle}>{t('earnings.balance')}</Text>
         <Text style={[styles.bigValue, isNegative && styles.negative]}>{formatCop(balance)}</Text>
         <Text style={styles.note}>
-          {isNegative
-            ? 'Debes las comisiones de los viajes cobrados en efectivo.'
-            : 'La plataforma te debe las ganancias de los viajes pagados con Mercado Pago.'}
+          {isNegative ? t('earnings.balanceNegative') : t('earnings.balancePositive')}
         </Text>
-        <Text style={styles.note}>
-          Mercado Pago suma tu ganancia; en efectivo ya recibiste el dinero y se descuenta la comisión. Incluye todos tus
-          viajes pagados.
-        </Text>
+        <Text style={styles.note}>{t('earnings.balanceNote')}</Text>
       </View>
     </ScrollView>
   );

@@ -3,15 +3,16 @@
 // Polyline (no Static Maps, A8), duración, distancia, comisión, propina y
 // calificación. El viaje sale de la misma escucha del historial
 // (useFinishedTrips), así que si cambia (por ejemplo, se paga) se ve aquí.
+// Textos en el idioma elegido (useLanguage).
 import React, { useCallback, useMemo, useRef } from 'react';
 import { View, Text, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import useFinishedTrips from '../../hooks/useFinishedTrips';
+import useLanguage from '../../hooks/useLanguage';
 import { decodePolyline } from '../../utils/polyline';
-import { historyStatusLabel } from '../../utils/earnings';
-import { formatCop, paymentMethodLabel } from '../../utils/tripRequestData';
+import { formatCop } from '../../utils/tripRequestData';
 import { formatDateTime } from '../../utils/dates';
-import { CATEGORY_OPTIONS, labelFor } from '../../constants/registrationOptions';
+import { optionLabel, paymentMethodText, historyStatusText } from '../../i18n/labels';
 
 const MAP_PADDING = { top: 40, right: 40, bottom: 40, left: 40 };
 
@@ -27,6 +28,7 @@ function DetailRow({ label, value }) {
 export default function TripDetailScreen({ route }) {
   const { tripId } = route.params;
   const { trips, isLoading } = useFinishedTrips();
+  const { t } = useLanguage();
   const trip = useMemo(() => trips.find((item) => item.id === tripId) ?? null, [trips, tripId]);
   const mapRef = useRef(null);
 
@@ -52,13 +54,15 @@ export default function TripDetailScreen({ route }) {
   if (!trip) {
     return (
       <View style={styles.center}>
-        <Text style={styles.error}>No se encontró este viaje.</Text>
+        <Text style={styles.error}>{t('tripDetail.notFound')}</Text>
       </View>
     );
   }
 
   const commissionLabel =
-    trip.commissionRate === null ? 'Comisión' : `Comisión (${Math.round(trip.commissionRate * 100)} %)`;
+    trip.commissionRate === null
+      ? t('tripDetail.commission')
+      : t('tripDetail.commissionRate', { rate: Math.round(trip.commissionRate * 100) });
 
   return (
     <ScrollView contentContainerStyle={styles.content}>
@@ -72,46 +76,46 @@ export default function TripDetailScreen({ route }) {
           longitudeDelta: 0.05,
         }}
         onMapReady={handleMapReady}
-        accessibilityLabel="Mapa con la ruta del viaje"
+        accessibilityLabel={t('tripDetail.map')}
       >
         <Marker
           coordinate={{ latitude: trip.origin.lat, longitude: trip.origin.lng }}
-          title="Recogida"
+          title={t('tripDetail.pickup')}
           pinColor="#15803D"
         />
         <Marker
           coordinate={{ latitude: trip.destination.lat, longitude: trip.destination.lng }}
-          title="Destino"
+          title={t('tripDetail.destination')}
           pinColor="#DC2626"
         />
         {routePoints.length > 1 ? <Polyline coordinates={routePoints} strokeWidth={5} strokeColor="#2563EB" /> : null}
       </MapView>
-      {routePoints.length < 2 ? <Text style={styles.note}>Este viaje no tiene la ruta guardada.</Text> : null}
+      {routePoints.length < 2 ? <Text style={styles.note}>{t('tripDetail.noRoute')}</Text> : null}
 
       <View style={styles.card}>
         <Text style={styles.date}>{formatDateTime(new Date(trip.completedAtMs))}</Text>
-        <Text style={[styles.sectionTitle, styles.spaced]}>Recogida</Text>
+        <Text style={[styles.sectionTitle, styles.spaced]}>{t('tripDetail.pickup')}</Text>
         <Text style={styles.address}>{trip.origin.address}</Text>
-        <Text style={[styles.sectionTitle, styles.spaced]}>Destino</Text>
+        <Text style={[styles.sectionTitle, styles.spaced]}>{t('tripDetail.destination')}</Text>
         <Text style={styles.address}>{trip.destination.address}</Text>
       </View>
 
       <View style={styles.card}>
-        <DetailRow label="Distancia" value={`${trip.distanceKm} km`} />
-        <DetailRow label="Duración" value={`${trip.durationMin} min`} />
-        <DetailRow label="Categoría" value={labelFor(CATEGORY_OPTIONS, trip.category)} />
-        <DetailRow label="Método de pago" value={paymentMethodLabel(trip.paymentMethod)} />
-        <DetailRow label="Estado del pago" value={historyStatusLabel(trip)} />
-        <DetailRow label="Calificación" value="Sin calificación" />
+        <DetailRow label={t('tripDetail.distance')} value={`${trip.distanceKm} km`} />
+        <DetailRow label={t('tripDetail.duration')} value={`${trip.durationMin} min`} />
+        <DetailRow label={t('fields.category')} value={optionLabel(t, 'category', trip.category)} />
+        <DetailRow label={t('tripDetail.paymentMethod')} value={paymentMethodText(t, trip.paymentMethod)} />
+        <DetailRow label={t('tripDetail.paymentStatus')} value={historyStatusText(t, trip)} />
+        <DetailRow label={t('tripDetail.rating')} value={t('tripDetail.noRating')} />
       </View>
 
       <View style={styles.card}>
-        <DetailRow label="Tarifa" value={formatCop(trip.fare)} />
+        <DetailRow label={t('tripDetail.fare')} value={formatCop(trip.fare)} />
         <DetailRow label={commissionLabel} value={`- ${formatCop(trip.commission)}`} />
-        <DetailRow label="Propina" value={formatCop(trip.tip)} />
+        <DetailRow label={t('tripDetail.tip')} value={formatCop(trip.tip)} />
         <View style={styles.divider} />
         <View style={styles.row}>
-          <Text style={styles.earningsLabel}>Tu ganancia</Text>
+          <Text style={styles.earningsLabel}>{t('tripDetail.yourEarnings')}</Text>
           <Text style={styles.earningsValue}>{formatCop(trip.driverEarnings)}</Text>
         </View>
       </View>
