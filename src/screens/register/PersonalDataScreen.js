@@ -3,6 +3,8 @@
 // Los datos viven en el RegistrationContext, no en esta pantalla: así no se
 // pierden al cambiar de pestaña. El error de cada campo aparece debajo de él
 // cuando el conductor sale del campo (onBlur) o toca "Siguiente".
+// Textos en el idioma elegido (useLanguage). Elegir el Idioma aquí cambia la
+// app al instante (enunciado: mismo selector de la app del pasajero).
 import React from 'react';
 import { ScrollView, Text, Pressable } from 'react-native';
 import TextField from '../../components/TextField';
@@ -12,7 +14,10 @@ import PhotoField from '../../components/PhotoField';
 import { formStyles } from '../../components/formStyles';
 import useRegistration from '../../hooks/useRegistration';
 import useSession from '../../hooks/useSession';
+import useLanguage from '../../hooks/useLanguage';
 import { GENDER_OPTIONS, LANGUAGE_OPTIONS } from '../../constants/registrationOptions';
+import { translatedOptions } from '../../i18n/labels';
+import { LANGUAGE_NAMES } from '../../i18n/translate';
 import { REGISTRATION_RULES } from '../../config/registration';
 import { hasErrors } from '../../utils/registrationErrors';
 import { yearsAgo } from '../../utils/dates';
@@ -20,6 +25,7 @@ import { PERSONAL_DATA_FIELDS } from '../../constants/registrationFields';
 
 export default function PersonalDataScreen({ navigation }) {
   const { user } = useSession();
+  const { t, changeLanguage } = useLanguage();
   const { form, touched, personalDataErrors, setField, touchFields } = useRegistration();
 
   // Solo se muestra el error de un campo que el conductor ya visitó.
@@ -42,10 +48,10 @@ export default function PersonalDataScreen({ navigation }) {
       keyboardDismissMode="on-drag" // al deslizar la pantalla se oculta el teclado
       automaticallyAdjustKeyboardInsets // iOS: deja ver el campo cuando sale el teclado
     >
-      <Text style={formStyles.step}>Paso 1 de 3</Text>
+      <Text style={formStyles.step}>{t('register.step', { number: 1 })}</Text>
 
       <PhotoField
-        label="Foto de perfil"
+        label={t('fields.profilePhoto')}
         value={form.profilePhoto}
         onChange={(uri) => setField('profilePhoto', uri)}
         onClose={touch('profilePhoto')}
@@ -53,7 +59,7 @@ export default function PersonalDataScreen({ navigation }) {
       />
 
       <TextField
-        label="Nombre completo"
+        label={t('fields.fullName')}
         value={form.fullName}
         onChangeText={(text) => setField('fullName', text)}
         onBlur={touch('fullName')}
@@ -61,22 +67,22 @@ export default function PersonalDataScreen({ navigation }) {
         maxLength={REGISTRATION_RULES.maxNameLength}
         autoCapitalize="words"
         autoComplete="name"
-        placeholder="Como aparece en tu documento"
+        placeholder={t('register.fullNamePlaceholder')}
       />
 
       <TextField
-        label="Número de documento"
+        label={t('register.documentNumber')}
         value={form.documentNumber}
         onChangeText={(text) => setField('documentNumber', text)}
         onBlur={touch('documentNumber')}
         error={errorFor('documentNumber')}
         keyboardType="number-pad"
         maxLength={10}
-        placeholder="Entre 6 y 10 números"
+        placeholder={t('register.documentPlaceholder')}
       />
 
       <TextField
-        label="Celular"
+        label={t('fields.phone')}
         value={form.phone}
         onChangeText={(text) => setField('phone', text)}
         onBlur={touch('phone')}
@@ -84,11 +90,11 @@ export default function PersonalDataScreen({ navigation }) {
         keyboardType="number-pad"
         maxLength={10}
         autoComplete="tel"
-        placeholder="Ej.: 3001234567"
+        placeholder={t('register.phonePlaceholder')}
       />
 
       <DateField
-        label="Fecha de nacimiento"
+        label={t('fields.birthDate')}
         value={form.birthDate}
         onChange={(date) => setField('birthDate', date)}
         onClose={touch('birthDate')}
@@ -99,9 +105,9 @@ export default function PersonalDataScreen({ navigation }) {
       />
 
       <SelectField
-        label="Género"
+        label={t('fields.gender')}
         value={form.gender}
-        options={GENDER_OPTIONS}
+        options={translatedOptions(t, GENDER_OPTIONS, 'gender')}
         onChange={(value) => {
           setField('gender', value);
           touchFields(['gender']);
@@ -113,26 +119,28 @@ export default function PersonalDataScreen({ navigation }) {
       {/* El correo es el de la cuenta (Firebase Auth): no se puede editar, así
           el correo del registro y el de inicio de sesión siempre coinciden. */}
       <TextField
-        label="Correo"
+        label={t('fields.email')}
         value={user?.email ?? ''}
         editable={false}
-        hint="Es el correo de tu cuenta."
+        hint={t('register.emailHint')}
       />
 
       <SelectField
-        label="Idioma"
+        label={t('fields.language')}
         value={form.language}
-        options={LANGUAGE_OPTIONS}
+        // Cada idioma con su nombre en ese idioma (Español / English).
+        options={LANGUAGE_OPTIONS.map((option) => ({ value: option.value, label: LANGUAGE_NAMES[option.value] }))}
         onChange={(value) => {
           setField('language', value);
           touchFields(['language']);
+          if (value) changeLanguage(value); // la app cambia de idioma al instante
         }}
         onClose={touch('language')}
         error={errorFor('language')}
       />
 
       <Pressable style={formStyles.primaryButton} onPress={handleNext} accessibilityRole="button">
-        <Text style={formStyles.primaryButtonText}>Siguiente: Vehículo</Text>
+        <Text style={formStyles.primaryButtonText}>{t('register.nextVehicle')}</Text>
       </Pressable>
     </ScrollView>
   );

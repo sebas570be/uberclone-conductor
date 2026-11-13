@@ -9,8 +9,10 @@ import { View, Text, Image, Pressable, Linking, StyleSheet } from 'react-native'
 import FormField from './FormField';
 import { formStyles } from './formStyles';
 import { pickPhoto } from '../services/photoService';
+import useLanguage from '../hooks/useLanguage';
 
 export default function PhotoField({ label, hint, value, onChange, onClose, error }) {
+  const { t } = useLanguage();
   const [deniedSource, setDeniedSource] = useState(null); // 'camera' | 'library' | null
 
   const handlePick = async (source) => {
@@ -27,29 +29,29 @@ export default function PhotoField({ label, hint, value, onChange, onClose, erro
   return (
     <FormField label={label} error={error} hint={hint}>
       {value ? (
-        <Image source={{ uri: value }} style={styles.preview} accessibilityLabel={`${label}: foto elegida`} />
+        <Image source={{ uri: value }} style={styles.preview} accessibilityLabel={t('fields.photoChosen', { label })} />
       ) : (
         <View style={[styles.preview, styles.empty, error && formStyles.inputError]}>
-          <Text style={formStyles.placeholder}>Sin foto</Text>
+          <Text style={formStyles.placeholder}>{t('fields.noPhoto')}</Text>
         </View>
       )}
 
       <View style={styles.buttons}>
-        <Pressable style={[styles.button, styles.buttonLeft]} onPress={() => handlePick('camera')} accessibilityRole="button" accessibilityLabel={`${label}: tomar foto`}>
-          <Text style={styles.buttonText}>{value ? 'Tomar otra' : 'Tomar foto'}</Text>
+        <Pressable style={[styles.button, styles.buttonLeft]} onPress={() => handlePick('camera')} accessibilityRole="button" accessibilityLabel={t('fields.takePhotoLabel', { label })}>
+          <Text style={styles.buttonText}>{value ? t('fields.retakePhoto') : t('fields.takePhoto')}</Text>
         </Pressable>
-        <Pressable style={styles.button} onPress={() => handlePick('library')} accessibilityRole="button" accessibilityLabel={`${label}: elegir de la galería`}>
-          <Text style={styles.buttonText}>Galería</Text>
+        <Pressable style={styles.button} onPress={() => handlePick('library')} accessibilityRole="button" accessibilityLabel={t('fields.galleryLabel', { label })}>
+          <Text style={styles.buttonText}>{t('fields.gallery')}</Text>
         </Pressable>
       </View>
 
       {deniedSource ? (
         <View style={styles.denied}>
           <Text style={formStyles.errorText}>
-            Sin permiso para usar la {deniedSource === 'camera' ? 'cámara' : 'galería'}. Actívalo en los Ajustes del celular.
+            {deniedSource === 'camera' ? t('fields.cameraDenied') : t('fields.libraryDenied')}
           </Text>
           <Pressable onPress={() => Linking.openSettings()} accessibilityRole="button" hitSlop={8}>
-            <Text style={styles.settingsLink}>Abrir Ajustes</Text>
+            <Text style={styles.settingsLink}>{t('home.openSettings')}</Text>
           </Pressable>
         </View>
       ) : null}

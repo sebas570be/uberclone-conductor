@@ -2,6 +2,7 @@
 // Pestaña 2 del registro: vehículo (enunciado §2).
 // Igual que Datos personales: los datos viven en el RegistrationContext y el
 // error aparece debajo del campo al salir de él o al tocar "Siguiente".
+// Textos en el idioma elegido (useLanguage).
 import React from 'react';
 import { ScrollView, Text, Pressable } from 'react-native';
 import TextField from '../../components/TextField';
@@ -9,7 +10,9 @@ import SelectField from '../../components/SelectField';
 import PhotoField from '../../components/PhotoField';
 import { formStyles } from '../../components/formStyles';
 import useRegistration from '../../hooks/useRegistration';
-import { CATEGORY_OPTIONS, COLOR_OPTIONS, labelFor } from '../../constants/registrationOptions';
+import useLanguage from '../../hooks/useLanguage';
+import { CATEGORY_OPTIONS, COLOR_OPTIONS } from '../../constants/registrationOptions';
+import { optionLabel, translatedOptions } from '../../i18n/labels';
 import { REGISTRATION_RULES } from '../../config/registration';
 import { hasErrors } from '../../utils/registrationErrors';
 import { normalizePlate } from '../../utils/validators';
@@ -17,6 +20,7 @@ import { VEHICLE_FIELDS } from '../../constants/registrationFields';
 
 export default function VehicleScreen({ navigation }) {
   const { form, touched, vehicleErrors, setField, touchFields } = useRegistration();
+  const { t } = useLanguage();
 
   const errorFor = (name) => (touched[name] ? vehicleErrors[name] : undefined);
   const touch = (name) => () => touchFields([name]);
@@ -26,7 +30,7 @@ export default function VehicleScreen({ navigation }) {
   const capacityHint =
     minimumCapacity === undefined
       ? undefined
-      : `Mínimo ${minimumCapacity} para ${labelFor(CATEGORY_OPTIONS, form.category)}.`;
+      : t('editProfile.capacityHint', { min: minimumCapacity, category: optionLabel(t, 'category', form.category) });
 
   const handleNext = () => {
     touchFields(VEHICLE_FIELDS);
@@ -43,14 +47,14 @@ export default function VehicleScreen({ navigation }) {
       keyboardDismissMode="on-drag" // al deslizar la pantalla se oculta el teclado
       automaticallyAdjustKeyboardInsets
     >
-      <Text style={formStyles.step}>Paso 2 de 3</Text>
+      <Text style={formStyles.step}>{t('register.step', { number: 2 })}</Text>
 
       {/* Al cambiar la categoría NO se borra la capacidad: el error de capacidad
           se recalcula solo (los errores salen de todo el formulario). */}
       <SelectField
-        label="Categoría"
+        label={t('fields.category')}
         value={form.category}
-        options={CATEGORY_OPTIONS}
+        options={translatedOptions(t, CATEGORY_OPTIONS, 'category')}
         onChange={(value) => {
           setField('category', value);
           touchFields(['category']);
@@ -62,7 +66,7 @@ export default function VehicleScreen({ navigation }) {
       {/* Enunciado: pasar a mayúsculas ANTES de validar. Se guarda ya convertida,
           así en Firestore nunca queda "abc123". */}
       <TextField
-        label="Placa"
+        label={t('fields.plate')}
         value={form.plate}
         onChangeText={(text) => setField('plate', normalizePlate(text))}
         onBlur={touch('plate')}
@@ -70,46 +74,46 @@ export default function VehicleScreen({ navigation }) {
         autoCapitalize="characters"
         autoCorrect={false}
         maxLength={6}
-        placeholder="Ej.: ABC123"
+        placeholder={t('register.platePlaceholder')}
       />
 
       <TextField
-        label="Marca"
+        label={t('fields.brand')}
         value={form.brand}
         onChangeText={(text) => setField('brand', text)}
         onBlur={touch('brand')}
         error={errorFor('brand')}
         maxLength={REGISTRATION_RULES.maxBrandModelLength}
         autoCapitalize="words"
-        placeholder="Ej.: Chevrolet"
+        placeholder={t('register.brandPlaceholder')}
       />
 
       <TextField
-        label="Modelo"
+        label={t('fields.model')}
         value={form.model}
         onChangeText={(text) => setField('model', text)}
         onBlur={touch('model')}
         error={errorFor('model')}
         maxLength={REGISTRATION_RULES.maxBrandModelLength}
         autoCapitalize="words"
-        placeholder="Ej.: Spark"
+        placeholder={t('register.modelPlaceholder')}
       />
 
       <TextField
-        label="Año"
+        label={t('fields.year')}
         value={form.year}
         onChangeText={(text) => setField('year', text)}
         onBlur={touch('year')}
         error={errorFor('year')}
         keyboardType="number-pad"
         maxLength={4}
-        placeholder="Ej.: 2020"
+        placeholder={t('register.yearPlaceholder')}
       />
 
       <SelectField
-        label="Color"
+        label={t('fields.color')}
         value={form.color}
-        options={COLOR_OPTIONS}
+        options={translatedOptions(t, COLOR_OPTIONS, 'color')}
         onChange={(value) => {
           setField('color', value);
           touchFields(['color']);
@@ -119,7 +123,7 @@ export default function VehicleScreen({ navigation }) {
       />
 
       <TextField
-        label="Capacidad (pasajeros)"
+        label={t('editProfile.capacity')}
         value={form.capacity}
         onChangeText={(text) => setField('capacity', text)}
         onBlur={touch('capacity')}
@@ -132,8 +136,8 @@ export default function VehicleScreen({ navigation }) {
       {/* Enunciado: la placa debe verse en la foto. No se puede verificar
           automáticamente: se le pide al conductor y lo revisa quien aprueba. */}
       <PhotoField
-        label="Foto del vehículo"
-        hint="Debe verse la placa."
+        label={t('fields.vehiclePhoto')}
+        hint={t('editProfile.vehiclePhotoHint')}
         value={form.vehiclePhoto}
         onChange={(uri) => setField('vehiclePhoto', uri)}
         onClose={touch('vehiclePhoto')}
@@ -141,7 +145,7 @@ export default function VehicleScreen({ navigation }) {
       />
 
       <Pressable style={formStyles.primaryButton} onPress={handleNext} accessibilityRole="button">
-        <Text style={formStyles.primaryButtonText}>Siguiente: Documentos</Text>
+        <Text style={formStyles.primaryButtonText}>{t('register.nextDocuments')}</Text>
       </Pressable>
 
       {/* Volver siempre se permite (lo escrito se conserva en el Context). */}
@@ -150,7 +154,7 @@ export default function VehicleScreen({ navigation }) {
         onPress={() => navigation.navigate('PersonalData')}
         accessibilityRole="button"
       >
-        <Text style={formStyles.secondaryButtonText}>Atrás: Datos personales</Text>
+        <Text style={formStyles.secondaryButtonText}>{t('register.backPersonalData')}</Text>
       </Pressable>
     </ScrollView>
   );

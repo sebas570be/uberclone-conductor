@@ -46,6 +46,7 @@ export function SessionProvider({ children }) {
   // Empieza en true: al abrir la app, Firebase tarda un momento en decir si
   // había una sesión guardada. Sin esto se vería el login por un instante.
   const [isLoading, setIsLoading] = useState(true);
+  // Clave del texto del error (src/i18n): RootNavigator lo muestra traducido.
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -100,7 +101,7 @@ export function SessionProvider({ children }) {
             if (!offlineTimer) {
               offlineTimer = setTimeout(() => {
                 offlineTimer = null;
-                setError('Sin conexión. Conéctate a internet para cargar tu información.');
+                setError('session.offline');
                 setIsLoading(false);
               }, OFFLINE_WAIT_MS);
             }
@@ -121,7 +122,7 @@ export function SessionProvider({ children }) {
           }
           clearOfflineTimer();
           console.log('Error escuchando el documento del conductor:', snapshotError.code);
-          setError('No se pudo cargar tu información. Revisa tu conexión e intenta de nuevo.');
+          setError('session.loadError');
           setIsLoading(false);
         }
       );

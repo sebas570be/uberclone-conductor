@@ -10,6 +10,7 @@ import { View, Text, Pressable, Platform, StyleSheet } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import FormField from './FormField';
 import { formStyles } from './formStyles';
+import useLanguage from '../hooks/useLanguage';
 
 export default function SelectField({
   label,
@@ -18,13 +19,15 @@ export default function SelectField({
   onChange,
   onClose, // iOS: se llama al tocar "Listo"; ahí se marca el campo como visitado
   error,
-  placeholder = 'Selecciona una opción',
+  placeholder, // si no se pasa: "Selecciona una opción" en el idioma elegido
 }) {
+  const { t } = useLanguage();
+  const placeholderText = placeholder ?? t('fields.selectPlaceholder');
   const [isOpen, setIsOpen] = useState(false);
   const selectedOption = options.find((option) => option.value === value);
 
   const items = [
-    <Picker.Item key="" label={placeholder} value="" color="#9CA3AF" />,
+    <Picker.Item key="" label={placeholderText} value="" color="#9CA3AF" />,
     ...options.map((option) => <Picker.Item key={option.value} label={option.label} value={option.value} />),
   ];
 
@@ -51,11 +54,11 @@ export default function SelectField({
         style={[formStyles.input, error && formStyles.inputError]}
         onPress={() => (isOpen ? close() : setIsOpen(true))}
         accessibilityRole="button"
-        accessibilityLabel={`${label}: ${selectedOption ? selectedOption.label : 'sin elegir'}`}
+        accessibilityLabel={`${label}: ${selectedOption ? selectedOption.label : t('fields.notSelected')}`}
         accessibilityState={{ expanded: isOpen }}
       >
         <Text style={selectedOption ? formStyles.valueText : formStyles.placeholder}>
-          {selectedOption ? selectedOption.label : placeholder}
+          {selectedOption ? selectedOption.label : placeholderText}
         </Text>
       </Pressable>
 
@@ -65,7 +68,7 @@ export default function SelectField({
             {items}
           </Picker>
           <Pressable style={formStyles.doneButton} onPress={close} accessibilityRole="button">
-            <Text style={formStyles.doneText}>Listo</Text>
+            <Text style={formStyles.doneText}>{t('common.done')}</Text>
           </Pressable>
         </View>
       )}

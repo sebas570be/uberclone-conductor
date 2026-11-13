@@ -1,5 +1,12 @@
 // src/utils/__tests__/registrationErrors.test.js
 import { getPersonalDataErrors, getVehicleErrors, getDocumentsErrors, hasErrors } from '../registrationErrors';
+import { errorText } from '../../i18n/labels';
+import { translate, DICTIONARIES } from '../../i18n/translate';
+
+// Los errores son { key, params }: se revisan ya traducidos, igual que los ve el conductor.
+const tEs = (key, params) => translate(DICTIONARIES, 'es', key, params);
+const tEn = (key, params) => translate(DICTIONARIES, 'en', key, params);
+const es = (error) => errorText(tEs, error);
 
 const TODAY = new Date(2026, 10, 6); // 6 de noviembre de 2026
 
@@ -38,7 +45,7 @@ describe('getPersonalDataErrors', () => {
 
   test('menor de edad: el error es de la edad, no de fecha vacía', () => {
     const errors = getPersonalDataErrors({ ...VALID_PERSONAL_DATA, birthDate: new Date(2008, 10, 7) }, TODAY);
-    expect(errors.birthDate).toBe('Debes ser mayor de 18 años para registrarte.');
+    expect(es(errors.birthDate)).toBe('Debes ser mayor de 18 años para registrarte.');
   });
 
   test('rechaza un género que no está en la lista', () => {
@@ -72,12 +79,13 @@ describe('getVehicleErrors', () => {
 
   test('cambiar a XL con capacidad 4: aparece el error de capacidad sin borrarla', () => {
     const errors = getVehicleErrors({ ...VALID_VEHICLE, category: 'xl' }, TODAY);
-    expect(errors.capacity).toBe('Escribe la capacidad: mínimo 6 pasajeros para XL.');
+    expect(es(errors.capacity)).toBe('Escribe la capacidad: mínimo 6 pasajeros para XL.');
+    expect(errorText(tEn, errors.capacity)).toBe('Enter the capacity: minimum 6 passengers for XL.');
   });
 
   test('sin categoría: la capacidad pide elegir primero la categoría', () => {
     const errors = getVehicleErrors({ ...VALID_VEHICLE, category: '' }, TODAY);
-    expect(errors.capacity).toBe('Elige primero la categoría para saber la capacidad mínima.');
+    expect(es(errors.capacity)).toBe('Elige primero la categoría para saber la capacidad mínima.');
   });
 });
 
@@ -101,13 +109,13 @@ describe('getDocumentsErrors', () => {
 
   test('SOAT que vence hoy: se considera vencido', () => {
     const errors = getDocumentsErrors({ ...VALID_DOCUMENTS, soatExpiry: new Date(2026, 10, 6) }, TODAY);
-    expect(errors.soatExpiry).toBe('Está vencido: la fecha de vencimiento debe ser posterior a hoy.');
+    expect(es(errors.soatExpiry)).toBe('Está vencido: la fecha de vencimiento debe ser posterior a hoy.');
   });
 
   test('vehículo de 5 años o más: la revisión técnico-mecánica es obligatoria', () => {
     const errors = getDocumentsErrors({ ...VALID_DOCUMENTS, year: '2021' }, TODAY);
-    expect(errors.technicalReviewExpiry).toBe('Elige la fecha de vencimiento de la revisión técnico-mecánica.');
-    expect(errors.technicalReviewPhoto).toBe('Agrega una foto de la revisión técnico-mecánica.');
+    expect(es(errors.technicalReviewExpiry)).toBe('Elige la fecha de vencimiento de la revisión técnico-mecánica.');
+    expect(es(errors.technicalReviewPhoto)).toBe('Agrega una foto de la revisión técnico-mecánica.');
   });
 
   test('sin foto de licencia ni del SOAT: hay error en cada una', () => {

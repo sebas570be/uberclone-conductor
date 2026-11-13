@@ -1,13 +1,18 @@
 // src/i18n/labels.js
 // Texto en el idioma actual para los CÓDIGOS que se guardan en Firestore
-// (género, categoría, color, método y estado del pago) y para los "tipos" de
-// error del cobro. Los datos guardan códigos ('gray', 'cash'); la pantalla
-// decide el idioma con t.
-// AI-assisted: see docs/AI_LOG.md #18 y #19
+// (género, categoría, color, método y estado del pago), para los "tipos" de
+// error del cobro y para los mensajes de validación. Los datos guardan códigos
+// ('gray', 'cash'); la pantalla decide el idioma con t.
+// AI-assisted: see docs/AI_LOG.md #18, #19 y #20
 import { TRIP_STATUS } from '../config/tripRequest';
 
 // optionLabel(t, 'color', 'gray') → 'Gris' / 'Gray'. '' si no hay valor.
 export const optionLabel = (t, group, value) => (value ? t(`options.${group}.${value}`) : '');
+
+// Opciones de una lista desplegable con el texto en el idioma actual (el valor
+// guardado sigue siendo el código).
+export const translatedOptions = (t, options, group) =>
+  options.map((option) => ({ value: option.value, label: optionLabel(t, group, option.value) }));
 
 export const paymentMethodText = (t, paymentMethod) => (paymentMethod ? t(`paymentMethod.${paymentMethod}`) : '');
 
@@ -38,4 +43,16 @@ export function verifyMessageKey(paymentStatus) {
   if (paymentStatus === 'rejected') return 'payment.rejected';
   if (paymentStatus === 'pending') return 'payment.stillPending';
   return null;
+}
+
+// Mensaje de validación (src/utils/registrationErrors.js): { key, params } →
+// texto. Un parámetro que también es { key } se traduce (por ejemplo, el nombre
+// de la categoría). Un texto que ya viene traducido se deja igual.
+export function errorText(t, error) {
+  if (!error) return undefined;
+  if (typeof error === 'string') return error;
+  const params = Object.fromEntries(
+    Object.entries(error.params ?? {}).map(([name, value]) => [name, value?.key ? t(value.key) : value])
+  );
+  return t(error.key, params);
 }

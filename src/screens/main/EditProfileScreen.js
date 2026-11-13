@@ -5,8 +5,7 @@
 // "Pendiente de aprobación". Las reglas de Firestore también lo exigen: una
 // app modificada no puede cambiar estos datos y seguir aprobada.
 // Mismos campos y validaciones del registro (registrationErrors).
-// Textos en el idioma elegido (useLanguage). Los mensajes de validación y los
-// textos de PhotoField/DateField se traducen con el registro.
+// Textos en el idioma elegido (useLanguage), incluidos los mensajes de validación.
 import React, { useMemo, useState } from 'react';
 import { ScrollView, View, Text, Pressable, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import TextField from '../../components/TextField';
@@ -18,7 +17,7 @@ import useSession from '../../hooks/useSession';
 import useActiveTrip from '../../hooks/useActiveTrip';
 import useLanguage from '../../hooks/useLanguage';
 import { GENDER_OPTIONS, CATEGORY_OPTIONS, COLOR_OPTIONS } from '../../constants/registrationOptions';
-import { optionLabel } from '../../i18n/labels';
+import { optionLabel, translatedOptions } from '../../i18n/labels';
 import { REGISTRATION_RULES } from '../../config/registration';
 import {
   getPersonalDataErrors,
@@ -45,10 +44,6 @@ function saveErrorKey(error) {
   return 'editProfile.saveError';
 }
 
-// Opciones de una lista con el texto en el idioma actual (el valor guardado
-// sigue siendo el código).
-const translatedOptions = (t, options, group) =>
-  options.map((option) => ({ value: option.value, label: optionLabel(t, group, option.value) }));
 
 function EditProfileForm({ user, driver }) {
   const { activeTrip } = useActiveTrip();

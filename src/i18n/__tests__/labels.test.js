@@ -6,6 +6,8 @@ import {
   historyStatusText,
   paymentErrorKey,
   verifyMessageKey,
+  translatedOptions,
+  errorText,
 } from '../labels';
 import { translate, DICTIONARIES } from '../translate';
 
@@ -49,5 +51,18 @@ describe('labels', () => {
     expect(verifyMessageKey('rejected')).toBe('payment.rejected');
     expect(verifyMessageKey('pending')).toBe('payment.stillPending');
     expect(verifyMessageKey('approved')).toBeNull();
+  });
+
+  test('opciones de una lista: mismo código, texto en el idioma', () => {
+    const options = [{ value: 'gray', label: 'Gris' }];
+    expect(translatedOptions(en, options, 'color')).toEqual([{ value: 'gray', label: 'Gray' }]);
+  });
+
+  test('mensaje de validación: traduce la clave y los parámetros que son claves', () => {
+    const error = { key: 'errors.capacity', params: { min: 6, category: { key: 'options.category.xl' } } };
+    expect(errorText(es, error)).toBe('Escribe la capacidad: mínimo 6 pasajeros para XL.');
+    expect(errorText(en, { key: 'errors.phone' })).toBe('The mobile phone must have 10 digits.');
+    expect(errorText(es, 'Ya traducido')).toBe('Ya traducido');
+    expect(errorText(es, undefined)).toBeUndefined();
   });
 });
