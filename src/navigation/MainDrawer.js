@@ -13,9 +13,9 @@ import {
 } from '@react-navigation/drawer';
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import TripStack from './TripStack';
-import PlaceholderScreen from '../components/PlaceholderScreen';
 import EarningsScreen from '../screens/main/EarningsScreen';
 import HistoryStack from './HistoryStack';
+import ProfileScreen from '../screens/main/ProfileScreen';
 import { signOut } from '../services/authService';
 import { saveDriverLocation } from '../services/locationService';
 import useSession from '../hooks/useSession';
@@ -78,7 +78,7 @@ export default function MainDrawer() {
         <Drawer.Screen name="Start" component={TripStack} options={startOptions} />
         <Drawer.Screen name="History" component={HistoryStack} options={historyOptions} />
         <Drawer.Screen name="Earnings" component={EarningsScreen} options={{ title: 'Ganancias' }} />
-        <Drawer.Screen name="Profile" component={PlaceholderScreen} options={{ title: 'Perfil y configuración' }} />
+        <Drawer.Screen name="Profile" component={ProfileScreen} options={{ title: 'Perfil' }} />
       </Drawer.Navigator>
     </ActiveTripProvider>
   );
