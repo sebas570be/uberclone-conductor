@@ -10,22 +10,8 @@ import {
 import { auth } from '../config/firebase';
 import { goOffline } from './availabilityService';
 
-// Mensajes en español para los códigos de error de Firebase.
-// Ojo: con la protección contra enumeración de correos (activa por defecto en
-// proyectos nuevos), un correo inexistente y una contraseña equivocada dan el
-// mismo código "auth/invalid-credential", para no revelar qué correos existen.
-const ERROR_MESSAGES = {
-  'auth/email-already-in-use': 'Ese correo ya tiene una cuenta.',
-  'auth/invalid-email': 'El correo no es válido.',
-  'auth/weak-password': 'La contraseña debe tener al menos 6 caracteres.',
-  'auth/invalid-credential': 'Correo o contraseña incorrectos.',
-  'auth/too-many-requests': 'Demasiados intentos. Espera unos minutos e intenta de nuevo.',
-  'auth/network-request-failed': 'Sin conexión. Revisa tu internet e intenta de nuevo.',
-};
-
-export function getAuthErrorMessage(error) {
-  return ERROR_MESSAGES[error?.code] ?? 'Ocurrió un error inesperado. Intenta de nuevo.';
-}
+// Los mensajes de error los elige la pantalla (LoginScreen, AUTH_ERROR_KEYS)
+// en el idioma del conductor: aquí solo se lanza el error con su código.
 
 // El correo se guarda sin espacios y en minúsculas para que "Ana@Gmail.com"
 // y "ana@gmail.com" sean la misma cuenta.

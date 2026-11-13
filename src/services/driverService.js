@@ -72,16 +72,3 @@ export async function updateDriverProfile(uid, driver, form) {
 export function updateDriverLanguage(uid, driver, language) {
   return updateDriverProfile(uid, driver, { ...profileFormFromDriver(driver), language });
 }
-
-// Mensajes en español para los errores de Firestore.
-const ERROR_MESSAGES = {
-  'permission-denied': 'No tienes permiso para guardar este registro. Cierra sesión y vuelve a entrar.',
-  unavailable: 'Sin conexión. Revisa tu internet e intenta de nuevo.',
-  'photo-upload-failed': 'No se pudieron subir las fotos. Revisa tu internet e intenta de nuevo.',
-};
-
-export function getDriverErrorMessage(error) {
-  // Sin internet, fetch lanza TypeError ("Network request failed") sin código.
-  if (error instanceof TypeError) return ERROR_MESSAGES.unavailable;
-  return ERROR_MESSAGES[error?.code] ?? 'No se pudo enviar el registro. Intenta de nuevo.';
-}

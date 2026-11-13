@@ -3,21 +3,13 @@
 // así que se prueban con Jest.
 // AI-assisted: see docs/AI_LOG.md #11
 import { PRICING } from '../config/pricing';
-import { TRIP_REQUEST, TRIP_STATUS, ACTIVE_TRIP_STATUSES } from '../config/tripRequest';
+import { TRIP_REQUEST, TRIP_STATUS, ACTIVE_TRIP_STATUSES, PAYMENT_STATUS } from '../config/tripRequest';
 
-const PAYMENT_METHOD_LABELS = Object.freeze({
-  mercadopago: 'Mercado Pago',
-  stripe: 'Stripe',
-  cash: 'Efectivo',
-});
-
-// Texto que ve el conductor para el estado del cobro (enunciado S4).
-const PAYMENT_STATUS_LABELS = Object.freeze({
-  approved: 'Aprobado',
-  pending: 'Pendiente',
-  rejected: 'Rechazado',
-  cash: 'Efectivo',
-});
+// Códigos válidos que llegan de Firestore. El texto que ve el conductor lo pone
+// la pantalla en su idioma (paymentMethodText y paymentStatusText en
+// src/i18n/labels.js).
+const PAYMENT_METHODS = Object.freeze(['mercadopago', 'stripe', 'cash']);
+const PAYMENT_STATUSES = Object.freeze(Object.values(PAYMENT_STATUS));
 
 const isPositiveNumber = (value) => typeof value === 'number' && Number.isFinite(value) && value > 0;
 
@@ -43,7 +35,7 @@ function parseTripBase(id, data) {
     createdAt instanceof Date &&
     !Number.isNaN(createdAt.getTime()) &&
     isKnownCategory(data.category) &&
-    Object.prototype.hasOwnProperty.call(PAYMENT_METHOD_LABELS, data.paymentMethod) &&
+    PAYMENT_METHODS.includes(data.paymentMethod) &&
     isPositiveNumber(data.distanceKm) &&
     isPositiveNumber(data.durationMin) &&
     isValidPlace(data.origin) &&
@@ -102,9 +94,7 @@ export function parseTripSummary(id, data) {
     commission,
     driverEarnings,
     commissionRate: typeof commissionRate === 'number' && commissionRate >= 0 && commissionRate <= 1 ? commissionRate : null,
-    paymentStatus: Object.prototype.hasOwnProperty.call(PAYMENT_STATUS_LABELS, data.paymentStatus)
-      ? data.paymentStatus
-      : null,
+    paymentStatus: PAYMENT_STATUSES.includes(data.paymentStatus) ? data.paymentStatus : null,
   };
 }
 
@@ -140,14 +130,4 @@ export function formatCop(value) {
   const sign = rounded < 0 ? '-' : '';
   const digits = String(Math.abs(rounded)).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   return `${sign}$ ${digits}`;
-}
-
-// Texto que ve el conductor para el método de pago ('cash' → 'Efectivo').
-export function paymentMethodLabel(paymentMethod) {
-  return PAYMENT_METHOD_LABELS[paymentMethod] ?? '';
-}
-
-// Texto del estado del cobro ('cash' → 'Efectivo'). Sin estado todavía: 'Pendiente'.
-export function paymentStatusLabel(paymentStatus) {
-  return PAYMENT_STATUS_LABELS[paymentStatus] ?? 'Pendiente';
 }
