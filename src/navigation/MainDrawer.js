@@ -15,7 +15,7 @@ import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import TripStack from './TripStack';
 import EarningsScreen from '../screens/main/EarningsScreen';
 import HistoryStack from './HistoryStack';
-import ProfileScreen from '../screens/main/ProfileScreen';
+import ProfileStack from './ProfileStack';
 import { signOut } from '../services/authService';
 import { saveDriverLocation } from '../services/locationService';
 import useSession from '../hooks/useSession';
@@ -38,6 +38,12 @@ function startOptions({ route }) {
 function historyOptions({ route }) {
   const isList = (getFocusedRouteNameFromRoute(route) ?? 'HistoryList') === 'HistoryList';
   return { title: 'Historial', headerShown: isList, swipeEnabled: isList };
+}
+
+// Perfil: lo mismo que Historial (encabezado y gesto del Drawer solo en el Perfil).
+function profileOptions({ route }) {
+  const isHome = (getFocusedRouteNameFromRoute(route) ?? 'ProfileHome') === 'ProfileHome';
+  return { title: 'Perfil', headerShown: isHome, swipeEnabled: isHome };
 }
 
 // Contenido del menú: las pantallas de siempre (DrawerItemList) y debajo
@@ -78,7 +84,7 @@ export default function MainDrawer() {
         <Drawer.Screen name="Start" component={TripStack} options={startOptions} />
         <Drawer.Screen name="History" component={HistoryStack} options={historyOptions} />
         <Drawer.Screen name="Earnings" component={EarningsScreen} options={{ title: 'Ganancias' }} />
-        <Drawer.Screen name="Profile" component={ProfileScreen} options={{ title: 'Perfil' }} />
+        <Drawer.Screen name="Profile" component={ProfileStack} options={profileOptions} />
       </Drawer.Navigator>
     </ActiveTripProvider>
   );

@@ -1,8 +1,9 @@
 // src/screens/main/ProfileScreen.js
 // Perfil (enunciado §3.7): los datos del conductor, su vehículo y sus
 // documentos. Se editan directo el celular y el correo de Mercado Pago (no se
-// comparan con ningún documento). Los datos salen del SessionContext, que ya
-// escucha drivers/{uid} en tiempo real.
+// comparan con ningún documento). La identidad, el vehículo y los documentos se
+// editan en EditProfileScreen (requieren una nueva aprobación). Los datos salen
+// del SessionContext, que ya escucha drivers/{uid} en tiempo real.
 import React, { useMemo, useState } from 'react';
 import { ScrollView, View, Text, Image, Pressable, ActivityIndicator, StyleSheet } from 'react-native';
 import TextField from '../../components/TextField';
@@ -41,7 +42,7 @@ function saveErrorMessage(error) {
 
 // El formulario se monta solo cuando ya están los datos del conductor: así el
 // estado inicial (useState) siempre parte del documento guardado.
-function ProfileForm({ user, driver }) {
+function ProfileForm({ user, driver, onEdit }) {
   const [form, setForm] = useState(() => profileFormFromDriver(driver));
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState(null); // { text, isError }
@@ -166,11 +167,16 @@ function ProfileForm({ user, driver }) {
           <Text style={formStyles.primaryButtonText}>Guardar cambios</Text>
         )}
       </Pressable>
+
+      <Pressable style={formStyles.secondaryButton} onPress={onEdit} accessibilityRole="button">
+        <Text style={formStyles.secondaryButtonText}>Editar identidad, vehículo o documentos</Text>
+      </Pressable>
+      <Text style={[formStyles.hint, styles.editHint]}>Esos cambios requieren una nueva aprobación.</Text>
     </ScrollView>
   );
 }
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   const { user, driver } = useSession();
 
   if (!user || !driver) {
@@ -181,7 +187,7 @@ export default function ProfileScreen() {
     );
   }
 
-  return <ProfileForm user={user} driver={driver} />;
+  return <ProfileForm user={user} driver={driver} onEdit={() => navigation.navigate('EditProfile')} />;
 }
 
 const styles = StyleSheet.create({
@@ -259,5 +265,8 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: {
     opacity: 0.4,
+  },
+  editHint: {
+    textAlign: 'center',
   },
 });

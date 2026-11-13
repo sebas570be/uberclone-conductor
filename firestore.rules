@@ -85,14 +85,26 @@ service cloud.firestore {
                && data.terms.commissionRate is number;
       }
 
-      // Solo al CREAR: los documentos deben estar vigentes. Al editar no se exige,
-      // para que un conductor aprobado con un documento vencido pueda corregir
-      // sus datos (la vigencia la revisa quien aprueba).
+      // Documentos vigentes: se exige al CREAR y al volver a revisión ("pending").
+      // Al cambiar solo el celular, el correo de Mercado Pago o el idioma no se
+      // exige, para que un conductor con un documento vencido pueda corregirlos.
       function hasValidDocumentsToday(data) {
         return data.documents.licenseExpiry > request.time
                && data.documents.soatExpiry > request.time
                && (data.documents.technicalReviewExpiry == null
                    || data.documents.technicalReviewExpiry > request.time);
+      }
+
+      // ¿Cambia algo que quien aprueba compara con los documentos? La identidad
+      // (nombre, género, foto), el vehículo o los documentos. Los mapas se
+      // comparan completos con != (cualquier campo distinto cuenta).
+      // Mismos campos que REVIEW_FIELDS en src/utils/driverProfile.js.
+      function changesReviewFields() {
+        return request.resource.data.personal.fullName != resource.data.personal.fullName
+               || request.resource.data.personal.gender != resource.data.personal.gender
+               || request.resource.data.personal.photoUrl != resource.data.personal.photoUrl
+               || request.resource.data.vehicle != resource.data.vehicle
+               || request.resource.data.documents != resource.data.documents;
       }
 
       // ---------- Permisos ----------
@@ -111,13 +123,18 @@ service cloud.firestore {
                     && isValidRegistration(request.resource.data)
                     && hasValidDocumentsToday(request.resource.data);
 
-      // Editar su perfil: puede cambiar sus datos (válidos), pero NO su estado
-      // ni la fecha de creación.
+      // Editar su perfil (Perfil): datos válidos y sin tocar la fecha de creación.
+      // a) Celular, correo de Mercado Pago o idioma: el estado NO cambia.
+      // b) Identidad, vehículo o documentos: vuelve a "pending" (nueva aprobación)
+      //    y, como al registrarse, con los documentos vigentes.
+      // Nunca puede aprobarse solo: el único cambio de estado permitido es a "pending".
       // La aprobación se hace desde la consola (simulada en la BD, como dice el enunciado).
       allow update: if isOwner()
-                    && request.resource.data.status == resource.data.status
                     && request.resource.data.createdAt == resource.data.createdAt
-                    && isValidRegistration(request.resource.data);
+                    && isValidRegistration(request.resource.data)
+                    && ((request.resource.data.status == resource.data.status && !changesReviewFields())
+                        || (request.resource.data.status == 'pending'
+                            && hasValidDocumentsToday(request.resource.data)));
 
       // Cancelar el registro (el Delete del CRUD): solo mientras está pendiente.
       allow delete: if isOwner()
