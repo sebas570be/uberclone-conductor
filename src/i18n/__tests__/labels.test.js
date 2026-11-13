@@ -1,5 +1,12 @@
 // src/i18n/__tests__/labels.test.js
-import { optionLabel, paymentMethodText, paymentStatusText, historyStatusText } from '../labels';
+import {
+  optionLabel,
+  paymentMethodText,
+  paymentStatusText,
+  historyStatusText,
+  paymentErrorKey,
+  verifyMessageKey,
+} from '../labels';
 import { translate, DICTIONARIES } from '../translate';
 
 // Un t de verdad para cada idioma (igual que el del LanguageContext).
@@ -27,5 +34,20 @@ describe('labels', () => {
     expect(historyStatusText(es, { status: 'completed', paymentStatus: 'rejected' })).toBe('Pendiente de pago');
     expect(historyStatusText(en, { status: 'completed', paymentStatus: null })).toBe('Payment pending');
     expect(historyStatusText(es, { status: 'paid', paymentStatus: 'cash' })).toBe('Efectivo');
+  });
+
+  test('error del cobro: tipo o código HTTP → clave; desconocido → genérico', () => {
+    expect(paymentErrorKey({ kind: 'network' })).toBe('payment.network');
+    expect(paymentErrorKey({ kind: 401 })).toBe('payment.session');
+    expect(paymentErrorKey({ kind: 409 })).toBe('payment.alreadyPaid');
+    expect(paymentErrorKey({ kind: 500 })).toBe('payment.generic');
+    expect(paymentErrorKey(undefined)).toBe('payment.generic');
+    expect(en(paymentErrorKey({ kind: 502 }))).toBe('Mercado Pago did not respond. Try again.');
+  });
+
+  test('verificar pago: rechazado y pendiente tienen mensaje; aprobado no', () => {
+    expect(verifyMessageKey('rejected')).toBe('payment.rejected');
+    expect(verifyMessageKey('pending')).toBe('payment.stillPending');
+    expect(verifyMessageKey('approved')).toBeNull();
   });
 });

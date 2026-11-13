@@ -4,35 +4,36 @@
 // puede cancelar (E1).
 // El viaje sale del ActiveTripContext (no de los parámetros de navegación):
 // si la app se cierra a mitad del viaje, al abrirla se sigue desde aquí.
+// Textos en el idioma elegido (useLanguage).
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import MapView, { Marker, Polyline } from 'react-native-maps';
 import { usePreventRemove } from '@react-navigation/native';
 import * as Location from 'expo-location';
 import useActiveTrip from '../../hooks/useActiveTrip';
+import useLanguage from '../../hooks/useLanguage';
+import { paymentMethodText } from '../../i18n/labels';
 import { TRIP_STATUS } from '../../config/tripRequest';
 import { updateTripStatus, cancelTrip, completeTrip } from '../../services/tripService';
 import { getDrivingRoute } from '../../services/routeService';
 import { decodePolyline } from '../../utils/polyline';
 import { calculateFare } from '../../utils/calculateFare';
-import { formatCop, paymentMethodLabel } from '../../utils/tripRequestData';
+import { formatCop } from '../../utils/tripRequestData';
 
 const MAP_PADDING = { top: 60, right: 40, bottom: 40, left: 40 };
 
-// Mensaje para el conductor si una actualización del viaje falla.
-function getUpdateErrorMessage(error) {
-  if (error?.code === 'permission-denied') {
-    return 'No se pudo actualizar el viaje: su estado ya cambió.';
-  }
-  return 'No se pudo actualizar el viaje. Revisa tu conexión e inténtalo de nuevo.';
+// Clave del mensaje si una actualización del viaje falla.
+function updateErrorKey(error) {
+  return error?.code === 'permission-denied' ? 'tripInProgress.statusChanged' : 'tripInProgress.updateError';
 }
 
 export default function TripInProgressScreen({ navigation }) {
   const { activeTrip } = useActiveTrip();
+  const { t } = useLanguage();
   const mapRef = useRef(null);
   const [pickupRoute, setPickupRoute] = useState(null); // { points, distanceKm, durationMin }
   const [isSending, setIsSending] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorKey, setErrorKey] = useState(null); // clave del texto del error
   // Qué se hizo al final (completed / cancelled), con qué viaje y si el
   // SERVIDOR ya lo confirmó: cuando el viaje deja de estar activo, decide a
   // qué pantalla ir.
@@ -53,7 +54,7 @@ export default function TripInProgressScreen({ navigation }) {
   // Bloquear el regreso mientras haya viaje activo (botón atrás de Android,
   // gesto o navigation.goBack). Cuando el viaje termina, deja de bloquear.
   usePreventRemove(Boolean(activeTrip), () => {
-    Alert.alert('Viaje en curso', 'Finaliza o cancela el viaje antes de salir.');
+    Alert.alert(t('tripInProgress.title'), t('tripInProgress.leaveMessage'));
   });
 
   // Al abrir: "aceptado" pasa a "va a recoger" (driver_arriving).
@@ -62,7 +63,7 @@ export default function TripInProgressScreen({ navigation }) {
     if (arrivingSentRef.current === activeTrip.id) return;
     arrivingSentRef.current = activeTrip.id;
     updateTripStatus(activeTrip.id, TRIP_STATUS.DRIVER_ARRIVING).catch((error) =>
-      setErrorMessage(getUpdateErrorMessage(error))
+      setErrorKey(updateErrorKey(error))
     );
   }, [activeTrip?.id, activeTrip?.status]);
 
@@ -149,7 +150,7 @@ export default function TripInProgressScreen({ navigation }) {
   // recrea en cada render).
   const runAction = useCallback(async (action) => {
     setIsSending(true);
-    setErrorMessage('');
+    setErrorKey(null);
     try {
       await action();
       // El servidor confirmó. Si era Finalizar/Cancelar, ya se puede salir.
@@ -159,7 +160,7 @@ export default function TripInProgressScreen({ navigation }) {
       }
     } catch (error) {
       finishedRef.current = null;
-      setErrorMessage(getUpdateErrorMessage(error));
+      setErrorKey(updateErrorKey(error));
     } finally {
       setIsSending(false);
     }
@@ -175,10 +176,10 @@ export default function TripInProgressScreen({ navigation }) {
   }, [activeTrip, runAction]);
 
   const handleCancel = useCallback(() => {
-    Alert.alert('Cancelar viaje', '¿Seguro que quieres cancelar este viaje?', [
-      { text: 'No', style: 'cancel' },
+    Alert.alert(t('tripInProgress.cancelTitle'), t('tripInProgress.cancelMessage'), [
+      { text: t('common.no'), style: 'cancel' },
       {
-        text: 'Sí, cancelar',
+        text: t('tripInProgress.confirmCancel'),
         style: 'destructive',
         onPress: () => {
           finishedRef.current = { status: TRIP_STATUS.CANCELLED, tripId: activeTrip.id, confirmed: false };
@@ -186,7 +187,7 @@ export default function TripInProgressScreen({ navigation }) {
         },
       },
     ]);
-  }, [activeTrip, runAction]);
+  }, [activeTrip, runAction, t]);
 
   if (!activeTrip) {
     return (
@@ -214,12 +215,12 @@ export default function TripInProgressScreen({ navigation }) {
       >
         <Marker
           coordinate={{ latitude: activeTrip.origin.lat, longitude: activeTrip.origin.lng }}
-          title="Recogida"
+          title={t('tripDetail.pickup')}
           pinColor="#15803D"
         />
         <Marker
           coordinate={{ latitude: activeTrip.destination.lat, longitude: activeTrip.destination.lng }}
-          title="Destino"
+          title={t('tripDetail.destination')}
           pinColor="#DC2626"
         />
         {visiblePoints.length > 1 ? (
@@ -228,19 +229,25 @@ export default function TripInProgressScreen({ navigation }) {
       </MapView>
 
       <View style={styles.panel}>
-        <Text style={styles.phase}>{isPickupPhase ? 'Ve a recoger al pasajero' : 'Lleva al pasajero a su destino'}</Text>
+        <Text style={styles.phase}>
+          {isPickupPhase ? t('tripInProgress.goToPickup') : t('tripInProgress.goToDestination')}
+        </Text>
         <Text style={styles.address}>{target.address}</Text>
         {isPickupPhase && pickupRoute ? (
           <Text style={styles.detail}>
-            A {pickupRoute.distanceKm} km · {pickupRoute.durationMin} min de ti
+            {t('tripInProgress.distanceToPickup', { km: pickupRoute.distanceKm, min: pickupRoute.durationMin })}
           </Text>
         ) : null}
         <Text style={styles.detail}>
-          Viaje: {activeTrip.distanceKm} km · {activeTrip.durationMin} min · {paymentMethodLabel(activeTrip.paymentMethod)}
+          {t('tripInProgress.tripInfo', {
+            km: activeTrip.distanceKm,
+            min: activeTrip.durationMin,
+            method: paymentMethodText(t, activeTrip.paymentMethod),
+          })}
           {estimate ? ` · ${formatCop(estimate.fare)}` : ''}
         </Text>
 
-        {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+        {errorKey ? <Text style={styles.error}>{t(errorKey)}</Text> : null}
 
         {isPickupPhase ? (
           <>
@@ -250,7 +257,7 @@ export default function TripInProgressScreen({ navigation }) {
               disabled={isSending || isWaitingStatus}
               accessibilityRole="button"
             >
-              {isSending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Pasajero a bordo</Text>}
+              {isSending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{t('tripInProgress.passengerOnBoard')}</Text>}
             </Pressable>
             <Pressable
               style={[styles.button, styles.cancelButton, isSending && styles.disabled]}
@@ -258,7 +265,7 @@ export default function TripInProgressScreen({ navigation }) {
               disabled={isSending}
               accessibilityRole="button"
             >
-              <Text style={styles.cancelText}>Cancelar viaje</Text>
+              <Text style={styles.cancelText}>{t('tripInProgress.cancel')}</Text>
             </Pressable>
           </>
         ) : (
@@ -268,7 +275,7 @@ export default function TripInProgressScreen({ navigation }) {
             disabled={isSending}
             accessibilityRole="button"
           >
-            {isSending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Finalizar viaje</Text>}
+            {isSending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>{t('tripInProgress.finish')}</Text>}
           </Pressable>
         )}
       </View>

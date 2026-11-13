@@ -3,14 +3,16 @@
 // categoría, método de pago, tarifa y ganancia neta ESTIMADAS (con
 // calculateFare, la misma función del cobro final), temporizador de 15 s y
 // botones Aceptar / Rechazar. Al llegar a 0 se rechaza sola.
+// Textos en el idioma elegido (useLanguage).
 // AI-assisted: see docs/AI_LOG.md #11
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, StyleSheet } from 'react-native';
 import { calculateFare } from '../../utils/calculateFare';
-import { getSecondsLeft, formatCop, paymentMethodLabel } from '../../utils/tripRequestData';
-import { CATEGORY_OPTIONS, labelFor } from '../../constants/registrationOptions';
+import { getSecondsLeft, formatCop } from '../../utils/tripRequestData';
 import { TRIP_STATUS } from '../../config/tripRequest';
-import { respondToTrip, getTripErrorMessage } from '../../services/tripService';
+import { respondToTrip } from '../../services/tripService';
+import useLanguage from '../../hooks/useLanguage';
+import { optionLabel, paymentMethodText } from '../../i18n/labels';
 
 function DetailRow({ label, value }) {
   return (
@@ -21,8 +23,15 @@ function DetailRow({ label, value }) {
   );
 }
 
+// Clave del mensaje si la respuesta falla. permission-denied: las reglas la
+// negaron (venció o ya no está en "requested").
+function respondErrorKey(error) {
+  return error?.code === 'permission-denied' ? 'tripRequest.expired' : 'tripRequest.sendError';
+}
+
 export default function TripRequestScreen({ route, navigation }) {
   const { trip } = route.params;
+  const { t } = useLanguage();
 
   // useMemo: la estimación solo se recalcula si cambia el viaje (no cada segundo
   // que el temporizador vuelve a dibujar la pantalla).
@@ -33,7 +42,7 @@ export default function TripRequestScreen({ route, navigation }) {
 
   const [secondsLeft, setSecondsLeft] = useState(() => getSecondsLeft(trip.createdAtMs, Date.now()));
   const [isSending, setIsSending] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
+  const [errorKey, setErrorKey] = useState(null); // clave del texto del error
   const [isClosed, setIsClosed] = useState(false); // ya no se puede responder
   // useRef: evita responder dos veces (doble toque, o el rechazo automático
   // justo después de tocar Aceptar) sin esperar a que se vuelva a dibujar.
@@ -45,7 +54,7 @@ export default function TripRequestScreen({ route, navigation }) {
       if (hasRespondedRef.current) return;
       hasRespondedRef.current = true;
       setIsSending(true);
-      setErrorMessage('');
+      setErrorKey(null);
       try {
         await respondToTrip(trip.id, status);
         if (status === TRIP_STATUS.ACCEPTED) {
@@ -56,7 +65,7 @@ export default function TripRequestScreen({ route, navigation }) {
         }
       } catch (error) {
         setIsSending(false);
-        setErrorMessage(getTripErrorMessage(error));
+        setErrorKey(respondErrorKey(error));
         if (error?.code === 'permission-denied') {
           // Las reglas la negaron (venció o ya no está en "requested"): no se reintenta.
           setIsClosed(true);
@@ -95,41 +104,41 @@ export default function TripRequestScreen({ route, navigation }) {
       <View style={[styles.timer, isUrgent && styles.timerUrgent]}>
         <Text
           style={[styles.timerNumber, isUrgent && styles.timerNumberUrgent]}
-          accessibilityLabel={`Quedan ${secondsLeft} segundos para responder`}
+          accessibilityLabel={t('tripRequest.secondsLeft', { seconds: secondsLeft })}
         >
           {secondsLeft}
         </Text>
-        <Text style={styles.timerLabel}>segundos</Text>
+        <Text style={styles.timerLabel}>{t('tripRequest.seconds')}</Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Recogida</Text>
+        <Text style={styles.sectionTitle}>{t('tripDetail.pickup')}</Text>
         <Text style={styles.address}>{trip.origin.address}</Text>
-        <Text style={[styles.sectionTitle, styles.spaced]}>Destino</Text>
+        <Text style={[styles.sectionTitle, styles.spaced]}>{t('tripDetail.destination')}</Text>
         <Text style={styles.address}>{trip.destination.address}</Text>
       </View>
 
       <View style={styles.card}>
-        <DetailRow label="Distancia" value={`${trip.distanceKm} km`} />
-        <DetailRow label="Duración" value={`${trip.durationMin} min`} />
-        <DetailRow label="Categoría" value={labelFor(CATEGORY_OPTIONS, trip.category)} />
-        <DetailRow label="Método de pago" value={paymentMethodLabel(trip.paymentMethod)} />
+        <DetailRow label={t('tripDetail.distance')} value={`${trip.distanceKm} km`} />
+        <DetailRow label={t('tripDetail.duration')} value={`${trip.durationMin} min`} />
+        <DetailRow label={t('fields.category')} value={optionLabel(t, 'category', trip.category)} />
+        <DetailRow label={t('tripDetail.paymentMethod')} value={paymentMethodText(t, trip.paymentMethod)} />
       </View>
 
       <View style={styles.card}>
-        <DetailRow label="Tarifa estimada" value={formatCop(estimate.fare)} />
+        <DetailRow label={t('tripRequest.estimatedFare')} value={formatCop(estimate.fare)} />
         <DetailRow
-          label={`Comisión (${Math.round(estimate.commissionRate * 100)} %)`}
+          label={t('tripDetail.commissionRate', { rate: Math.round(estimate.commissionRate * 100) })}
           value={`- ${formatCop(estimate.commission)}`}
         />
         <View style={styles.divider} />
         <View style={styles.row}>
-          <Text style={styles.earningsLabel}>Tu ganancia estimada</Text>
+          <Text style={styles.earningsLabel}>{t('tripRequest.estimatedEarnings')}</Text>
           <Text style={styles.earningsValue}>{formatCop(estimate.driverEarnings)}</Text>
         </View>
       </View>
 
-      {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+      {errorKey ? <Text style={styles.error}>{t(errorKey)}</Text> : null}
 
       {isClosed ? (
         <Pressable
@@ -137,7 +146,7 @@ export default function TripRequestScreen({ route, navigation }) {
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
         >
-          <Text style={styles.acceptText}>Volver al inicio</Text>
+          <Text style={styles.acceptText}>{t('common.backHome')}</Text>
         </Pressable>
       ) : (
         <View style={styles.buttons}>
@@ -146,18 +155,22 @@ export default function TripRequestScreen({ route, navigation }) {
             onPress={handleReject}
             disabled={!canRespond}
             accessibilityRole="button"
-            accessibilityLabel="Rechazar solicitud"
+            accessibilityLabel={t('tripRequest.rejectLabel')}
           >
-            <Text style={styles.rejectText}>Rechazar</Text>
+            <Text style={styles.rejectText}>{t('tripRequest.reject')}</Text>
           </Pressable>
           <Pressable
             style={[styles.button, styles.acceptButton, !canRespond && styles.disabled]}
             onPress={handleAccept}
             disabled={!canRespond}
             accessibilityRole="button"
-            accessibilityLabel="Aceptar solicitud"
+            accessibilityLabel={t('tripRequest.acceptLabel')}
           >
-            {isSending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.acceptText}>Aceptar</Text>}
+            {isSending ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <Text style={styles.acceptText}>{t('tripRequest.accept')}</Text>
+            )}
           </Pressable>
         </View>
       )}
