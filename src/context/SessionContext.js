@@ -4,6 +4,8 @@
 // Escucha a Firebase en tiempo real:
 //   1) onAuthStateChanged: ¿hay un usuario con sesión iniciada?
 //   2) onSnapshot de drivers/{uid}: ¿ya envió su registro? ¿está aprobado?
+// También entrega los datos del conductor (driver) para la pantalla Perfil:
+// así no hace falta una segunda escucha del mismo documento.
 // Si el estado cambia en la base de datos (por ejemplo, de "pending" a
 // "approved" desde la consola), la app cambia de pantalla sola.
 // AI-assisted: see docs/AI_LOG.md #6
@@ -39,6 +41,8 @@ export const SessionContext = createContext(null);
 export function SessionProvider({ children }) {
   const [user, setUser] = useState(null);
   const [driverStatus, setDriverStatus] = useState(DRIVER_STATUS.SIGNED_OUT);
+  // Documento drivers/{uid} tal como está en Firestore (null si no existe).
+  const [driver, setDriver] = useState(null);
   // Empieza en true: al abrir la app, Firebase tarda un momento en decir si
   // había una sesión guardada. Sin esto se vería el login por un instante.
   const [isLoading, setIsLoading] = useState(true);
@@ -70,6 +74,7 @@ export function SessionProvider({ children }) {
       // para no seguir leyendo el documento de otra persona.
       stopDriverListener();
       setUser(firebaseUser);
+      setDriver(null); // no mostrar los datos del usuario anterior
       setError(null);
 
       if (!firebaseUser) {
@@ -104,6 +109,7 @@ export function SessionProvider({ children }) {
           // Llegó una respuesta válida: ya no hace falta el aviso.
           clearOfflineTimer();
           setDriverStatus(statusFromSnapshot(snapshot));
+          setDriver(snapshot.exists() ? snapshot.data() : null);
           setError(null);
           setIsLoading(false);
         },
@@ -131,8 +137,8 @@ export function SessionProvider({ children }) {
   // useMemo: el objeto solo se crea de nuevo cuando cambia algún dato, así las
   // pantallas que usan el contexto no se vuelven a dibujar sin necesidad.
   const value = useMemo(
-    () => ({ user, driverStatus, isLoading, error }),
-    [user, driverStatus, isLoading, error]
+    () => ({ user, driver, driverStatus, isLoading, error }),
+    [user, driver, driverStatus, isLoading, error]
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
