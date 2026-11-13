@@ -4,7 +4,7 @@
 // AI-assisted: see docs/AI_LOG.md #11
 import { collection, doc, onSnapshot, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { TRIP_STATUS, ACTIVE_TRIP_STATUSES, PAYMENT_STATUS } from '../config/tripRequest';
+import { TRIP_STATUS, ACTIVE_TRIP_STATUSES, FINISHED_TRIP_STATUSES, PAYMENT_STATUS } from '../config/tripRequest';
 import { buildCompletionData } from '../utils/tripCompletion';
 
 // Escucha en tiempo real las solicitudes "requested" de este conductor.
@@ -34,6 +34,22 @@ export function subscribeToActiveTrips(uid, onTrips, onError) {
   );
   return onSnapshot(
     activeQuery,
+    (snapshot) => onTrips(snapshot.docs.map((tripDoc) => ({ id: tripDoc.id, data: tripDoc.data() }))),
+    onError
+  );
+}
+
+// Escucha en tiempo real los viajes TERMINADOS de este conductor (Historial y
+// Ganancias). Como las demás consultas, filtra por driverId (las reglas solo
+// dejan leer los viajes propios). El orden y los filtros se aplican en la app.
+export function subscribeToFinishedTrips(uid, onTrips, onError) {
+  const finishedQuery = query(
+    collection(db, 'trips'),
+    where('driverId', '==', uid),
+    where('status', 'in', FINISHED_TRIP_STATUSES)
+  );
+  return onSnapshot(
+    finishedQuery,
     (snapshot) => onTrips(snapshot.docs.map((tripDoc) => ({ id: tripDoc.id, data: tripDoc.data() }))),
     onError
   );

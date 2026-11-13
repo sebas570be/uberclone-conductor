@@ -920,3 +920,41 @@ Ya monté el esqueleto de navegación que revisamos y lo probé en mi iPhone con
 - **Aprendizaje:**
   - Una afirmación de seguridad se comprueba ejecutando el código con los mismos ejemplos, no solo leyéndola.
   - Lo que aplica a un build propio (`app.json`) no siempre aplica a Expo Go.
+
+### Entrada #16
+
+- **Fecha:** 12/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramientas:** Gemini (Google) para la revisión crítica; Claude (Anthropic) para revisar la respuesta de Gemini.
+- **Objetivo:** Revisar las funciones de ganancias e historial (commit `62e2f99`) y la escucha de viajes terminados con el hook `useEarnings` (commit `f8fc266`) antes de montarlos: rangos de fechas, totales (T8), saldo con la plataforma (T9), consulta a Firestore y estados del hook.
+
+- **Prompt a Gemini (textual, inicio):** "Actúa como revisor de código CRÍTICO de una app React Native (Expo SDK 58, JavaScript, React 19, React Native 0.88, Expo Go en iPhone, Firebase JS SDK 13 con Firestore). Sustenta cada observación con documentación oficial (Firebase/Firestore, React, React Native, MDN) y di si algo depende de la versión. Si algo está bien, dilo; no propongas cambios por cambiar. Para cada problema da: archivo, línea aproximada, por qué es un problema real (con un caso concreto) y el cambio mínimo." + contexto (campos de la colección `trips`, regla de lectura por `driverId`, decisiones ya tomadas: una sola escucha con filtros en la app, solo cuentan los viajes `paid`, "Pendiente de pago" aparte, saldo T9 de todos los viajes, semana de lunes a domingo), el código de `earnings.js`, `parseFinishedTrip`, `subscribeToFinishedTrips`, `useFinishedTrips`, `useEarnings` y la lógica de `EarningsScreen`, y 8 preguntas:
+  1. ¿La consulta `where('driverId','==',uid)` + `where('status','in',[...])` necesita un índice compuesto? ¿La regla de lectura la permite?
+  2. Si Ganancias e Historial usan `useFinishedTrips` a la vez, ¿el SDK comparte una sola escucha o se duplican lecturas?
+  3. ¿`getPeriodRange`, `getCustomRange` y `addDays` son correctas en hora local (cambio de hora, fin de mes, fin de año, domingo)?
+  4. `getPeriodRange(period)` usa `new Date()` dentro del `useMemo`: ¿"Hoy" queda viejo si la pantalla sigue abierta después de medianoche?
+  5. ¿`summarizeEarnings` y `calculateBalance` cumplen "Saldo = ganancias de viajes pagados por pasarela − comisiones de viajes en efectivo"? ¿Algún caso límite?
+  6. Se cargan todos los viajes terminados en memoria: ¿hasta qué volumen es razonable?
+  7. ¿El manejo de carga, error y cleanup de `useFinishedTrips` es correcto? ¿Hay un estado inconsistente al cerrar sesión?
+  8. ¿Qué prueba importante falta?
+- **Mensaje de aprobación:** "aprobado".
+
+- **Respuesta de Gemini y decisión:**
+  - **Se aceptó:** la escucha compartida (el SDK reutiliza la escucha de consultas idénticas), los cálculos de `summarizeEarnings` y `calculateBalance`, que cargar todo en memoria es razonable para el volumen de un proyecto académico, y el cleanup de `useFinishedTrips`.
+  - **Se modificó:** el riesgo de la pregunta 4 era real. Si la pantalla sigue abierta pasada la medianoche, "Hoy" seguiría siendo el día anterior hasta que cambien los viajes. Cambio mínimo en `useEarnings`: `useIsFocused()` y `today = new Date().toDateString()` como dependencia del `useMemo`, así que al volver a la pantalla otro día el rango se recalcula. El mismo arreglo quedó en `HistoryScreen`.
+  - **Se descartó:** que la consulta "requiere estrictamente un índice compuesto". La documentación de Firestore (Index overview) dice que con los índices automáticos de un solo campo se pueden hacer consultas `in` combinadas con igualdad (`==`) gracias a la combinación de índices. Solo `in` más un rango en otro campo necesita un índice manual. Además, `subscribeToActiveTrips` usa la misma forma desde feature/viaje y funciona sin índice.
+  - **Se descartó:** que comparar milisegundos "UTC" con la medianoche local pueda fallar. `getTime()` es un instante absoluto en los dos lados. Colombia no tiene cambio de hora, y `addDays` usa el constructor de calendario, no suma milisegundos. El propio Gemini concluye que no requiere cambios.
+  - **Se descartó:** los 3 casos de prueba que según Gemini faltaban. Ya existían: "solo cuenta los pagados; los pendientes van aparte" y "los viajes sin pagar no cambian el saldo"; "solo efectivo: saldo negativo"; "sin viajes: todo en 0 (sin dividir por 0)".
+
+- **Archivos y commit:** `src/utils/earnings.js`, `src/utils/tripRequestData.js`, `src/config/history.js` y sus pruebas (`62e2f99`); `src/config/tripRequest.js`, `src/services/tripService.js`, `src/hooks/useFinishedTrips.js`, `src/hooks/useEarnings.js`, `src/screens/main/EarningsScreen.js`, `src/navigation/MainDrawer.js` (`f8fc266`).
+
+- **Verificación:**
+  - `npm test`: 115 pruebas pasando (20 de `earnings` y 4 nuevas de `tripRequestData`).
+  - En el iPhone, Ganancias Hoy mostró 2 viajes pagados, 26.700 facturado, −5.340 en comisiones, ganancia neta de 21.360, promedio de 10.680 y saldo de 9.360. Pendiente de pago: 6 viajes · 85.100 en Hoy y 7 viajes · 103.900 en Semana y Mes.
+  - Los 18.800 de diferencia entre Hoy y Semana son el viaje en efectivo del 11/11, lo que confirma que los rangos funcionan.
+  - No se creó ningún índice en la consola de Firebase.
+
+- **Aprendizaje:**
+  - Una afirmación sobre índices de Firestore se comprueba en la documentación oficial y con una consulta que ya funciona en el proyecto, no se acepta porque suene segura.
+  - Un `useMemo` que depende de la fecha actual necesita algo que lo obligue a recalcular (aquí, el día como dependencia); si no, se queda con el valor viejo.
+  - Antes de agregar pruebas "que faltan", hay que revisar si ya existen.

@@ -14,6 +14,8 @@ import {
 import { getFocusedRouteNameFromRoute } from '@react-navigation/native';
 import TripStack from './TripStack';
 import PlaceholderScreen from '../components/PlaceholderScreen';
+import EarningsScreen from '../screens/main/EarningsScreen';
+import HistoryStack from './HistoryStack';
 import { signOut } from '../services/authService';
 import { saveDriverLocation } from '../services/locationService';
 import useSession from '../hooks/useSession';
@@ -28,6 +30,14 @@ function startOptions({ route }) {
   const focusedScreen = getFocusedRouteNameFromRoute(route) ?? 'Home';
   const isHome = focusedScreen === 'Home';
   return { title: 'Inicio', headerShown: isHome, swipeEnabled: isHome };
+}
+
+// Historial: el encabezado y el gesto del Drawer solo en la lista; en el
+// detalle se ocultan para que se vea el botón de atrás del Stack y el gesto
+// de deslizar a la derecha vuelva a la lista (como en Inicio).
+function historyOptions({ route }) {
+  const isList = (getFocusedRouteNameFromRoute(route) ?? 'HistoryList') === 'HistoryList';
+  return { title: 'Historial', headerShown: isList, swipeEnabled: isList };
 }
 
 // Contenido del menú: las pantallas de siempre (DrawerItemList) y debajo
@@ -66,8 +76,8 @@ export default function MainDrawer() {
     <ActiveTripProvider>
       <Drawer.Navigator drawerContent={(props) => <DrawerContent {...props} />}>
         <Drawer.Screen name="Start" component={TripStack} options={startOptions} />
-        <Drawer.Screen name="History" component={PlaceholderScreen} options={{ title: 'Historial' }} />
-        <Drawer.Screen name="Earnings" component={PlaceholderScreen} options={{ title: 'Ganancias' }} />
+        <Drawer.Screen name="History" component={HistoryStack} options={historyOptions} />
+        <Drawer.Screen name="Earnings" component={EarningsScreen} options={{ title: 'Ganancias' }} />
         <Drawer.Screen name="Profile" component={PlaceholderScreen} options={{ title: 'Perfil y configuración' }} />
       </Drawer.Navigator>
     </ActiveTripProvider>
