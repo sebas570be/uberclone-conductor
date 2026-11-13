@@ -80,7 +80,7 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - **Mercado Pago (Checkout Pro, modo de prueba):** la app nunca habla con Mercado Pago. Le pide al backend (`backend/`, `npm start`) que cree el cobro, con el monto guardado en Firestore. El checkout se abre dentro de la app con `expo-web-browser`, y al cerrarlo el backend verifica el pago (monto y moneda) y marca el viaje como pagado. Un viaje de Mercado Pago no se puede marcar pagado desde la app.
 - **Sin webhook:** el backend vive en la red local del PC, sin URL pública; el pago se verifica al volver del checkout, y también con el botón "Verificar pago".
 - **Salir sin cobrar:** se permite con un aviso; el viaje queda `completed` (por cobrar).
-- **Limitación conocida:** en desarrollo, la app llama al backend por `http` en la red local. En un APK de Android el tráfico `http` está bloqueado, y en producción el token de sesión debe viajar por `https`.
+- **Limitación conocida:** la app llama al backend por `http` en la red local (en la APK se permite con `usesCleartextTraffic`, ver la sección APK). En producción el backend debe estar en un servidor con `https`, porque el token de sesión viaja en cada llamada.
 
 ## Historial y ganancias
 
@@ -100,6 +100,19 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - **Cerrar sesión:** desde el menú o desde Configuración; primero se marca No disponible y después se cierra la sesión.
 - **Limitación:** la página de pago de Mercado Pago sale en español (cuenta de Colombia); la controla Mercado Pago, no la app.
 
+## APK (Android)
+
+- **Instalar:** la APK se genera con EAS Build (distribución interna). En la página del build en expo.dev, **Install** muestra un QR con el enlace de descarga (válido 13 días). En Android hay que permitir "instalar apps de esta fuente" y, si aparece Play Protect, "Instalar de todas formas" (pasa con toda APK que no viene de la Play Store).
+- **Generar:** `eas build -p android --profile preview`. El perfil `preview` de `eas.json` produce una APK de distribución interna con el entorno `preview` de EAS.
+- **Variables:** el `.env` no se sube (ni a Git ni a EAS). Las `EXPO_PUBLIC_*` y `GOOGLE_MAPS_ANDROID_API_KEY` están como variables de entorno de EAS (entorno `preview`); `app.config.js` toma `app.json` y le agrega la llave de Maps, porque `app.json` no puede leer variables.
+- **Identidad:** nombre "UberClone Conductor", paquete `com.sebas570be.uberclone.conductor`, versión 1.0.0 (`versionCode` 1), ícono propio (iOS y Android adaptativo) y pantalla inicial con `expo-splash-screen`.
+- **Google Maps en Android:** la llave está restringida a esta app (paquete + huella SHA-1 del keystore de EAS) y solo a "Maps SDK for Android", con una alerta de presupuesto en Google Cloud (enunciado §7). En Expo Go no hace falta: Expo pone su propia llave.
+- **Permisos mínimos:** ubicación, cámara y fotos. `RECORD_AUDIO` (que `expo-image-picker` agrega para grabar video) está bloqueado en `blockedPermissions`, porque la app solo toma fotos.
+- **`http` en la red local:** Android bloquea el tráfico `http` en una APK; `expo-build-properties` lo permite (`usesCleartextTraffic`) para llegar al backend del PC. Solo sirve para la demo: en producción, `https`.
+- **R8 desactivado:** la primera APK se cerraba al abrir. Con `adb logcat` se vio `Failed to create an instance of class androidx.work.impl.WorkDatabase`: R8 (el optimizador de los builds de release) eliminaba una clase que WorkManager busca por su nombre. Se desactivó con `enableMinifyInReleaseBuilds: false` (la APK pesa algo más).
+- **Barra de navegación de Android:** las apps de Expo se dibujan detrás de esa barra (*edge-to-edge*); las pantallas del menú dejan su espacio con `SafeAreaView` (`screenLayout` del Drawer) para que no tape los botones (sin probar todavía en la APK; entra en el próximo build).
+- **Probada en** un POCO X3 Pro (Android 12): inicio de sesión, mapa, Disponible, solicitud, viaje y cobro con Mercado Pago aprobado (capturas 124–134).
+
 ## Estado del desarrollo
 
 - [x] Arquitectura por capas
@@ -113,6 +126,7 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - [x] Cobro con Mercado Pago y en efectivo
 - [x] Historial y resumen de ganancias
 - [x] Perfil, configuración e idioma (español / inglés)
+- [x] APK de Android con EAS Build (distribución interna)
 
 ## Uso de IA
 

@@ -1112,3 +1112,55 @@ Ya monté el esqueleto de navegación que revisamos y lo probé en mi iPhone con
   
 - **Aprendizaje:**
   - Si la validación devuelve una clave con parámetros en vez de una frase, la misma regla sirve para los dos idiomas y la prueba no depende del texto.
+
+### Entrada #21
+
+- **Fecha:** 13/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramienta:** Claude (Anthropic).
+- **Objetivo:** Generar la APK de Android con EAS Build (microcurrículo, semana 15: "configuración de aplicación, íconos, pantalla inicial, variables de entorno, versionamiento y creación de APK"), con el mapa funcionando y la llave de Google restringida (enunciado §7), y diagnosticar por qué la primera APK se cerraba al abrir.
+
+- **Prompt / proceso (textual):**
+  - "si tengo un android y también se puede usar el emulador".
+  - "No tengo cuenta en expo.dev y todas las recomendaciones las acepto y las apruebo".
+  - "dame algo que funcione porque estamos es dando vueltas con esto" (cuando la APK se cerraba al abrir).
+  - "aprobado" en cada cambio.
+  - Claude me dio el código y la configuración; lo revisé, lo aprobé y después se copió a los archivos del proyecto.
+
+- **Resumen de lo generado:**
+  - `eas.json` con el perfil `preview`: APK de distribución interna que usa el entorno `preview` de EAS.
+  - `app.json`:
+    - nombre "UberClone Conductor", paquete `com.sebas570be.uberclone.conductor`, `versionCode` 1;
+    - `RECORD_AUDIO` en `blockedPermissions` (la app solo toma fotos);
+    - `expo-build-properties` con `usesCleartextTraffic` (backend por `http` en la red local) y `enableMinifyInReleaseBuilds: false`;
+    - plugin `expo-splash-screen`.
+  - `app.config.js`: toma `app.json` y le agrega la llave de Google Maps desde una variable de EAS (`app.json` no puede leer variables).
+  - Ícono propio (iOS y Android adaptativo, con versión monocromática) y pantalla inicial.
+  - `MainDrawer.js`: `screenLayout` con `SafeAreaView` (`edges={['bottom']}`) para que la barra de navegación de Android no tape los botones.
+  - Configuración fuera del código, en la web:
+    - variables `EXPO_PUBLIC_*` y `GOOGLE_MAPS_ANDROID_API_KEY` en EAS (entorno `preview`);
+    - llave de Maps restringida a la app (paquete + SHA-1 del keystore de EAS) y solo a "Maps SDK for Android";
+    - alerta de presupuesto en Google Cloud.
+
+- **Qué se usó / modificó / descartó:**
+  - **Se usó:** `expo-doctor` antes de cada build. Detectó 3 paquetes con versiones de parche atrasadas, que se alinearon con `npx expo install --fix`.
+  - **Se usó:** diagnóstico con `adb logcat` (Platform-Tools) cuando la primera APK se cerraba al abrir. El log mostró `Failed to create an instance of class androidx.work.impl.WorkDatabase`: R8, el optimizador de los builds de release, eliminaba una clase que WorkManager busca por su nombre. En Expo Go no pasaba porque ahí no hay R8.
+  - **Se modificó:** la llave Demo de Google Maps no incluía "Maps SDK for Android"; para habilitarlo se activó la prueba gratuita de Google Cloud, y la llave se restringió por app y por API.
+  - **Se descartó:**
+    - reglas de ProGuard (`extraProguardRules`) para dejar R8 activo: no estaba garantizado que funcionaran al primer build, y cada build tarda entre 30 y 50 minutos;
+    - un túnel `https` para el backend: la URL cambia cada vez; queda como limitación (`http` solo en la red local);
+    - agregar el plugin `expo-status-bar` que sugería `expo install --fix`: no cambia nada visible;
+    - el "límite de inversión" de Google Cloud: no está disponible para Maps, así que se usó "solo alertas".
+
+- **Archivos y commits:** `app.json`, `app.config.js`, `eas.json`, `package.json` y `package-lock.json` (commit `d978808`); ícono y pantalla inicial en `assets/` (commit `bd98585`); versiones de SDK 58 alineadas (commit `79637b7`); R8 desactivado (commit `ccc87f4`); `src/navigation/MainDrawer.js` (commit `4a23835`).
+
+- **Verificación:**
+  - `npx expo-doctor`: 20/20. `npx expo config --type public` mostró el paquete, `versionCode`, `RECORD_AUDIO` bloqueado, `usesCleartextTraffic`, el plugin de `react-native-maps` y `enableMinifyInReleaseBuilds: false`. `npm test`: 133 pruebas pasando.
+  - Build 1: compiló, pero la APK se cerraba al abrir; se diagnosticó con `adb logcat`.
+  - Build 2 (R8 desactivado), en un POCO X3 Pro con Android 12: abre, inicia sesión, muestra el mapa con la llave restringida, se pone Disponible, recibe la solicitud, hace el viaje completo y cobra con Mercado Pago. Pago aprobado (operación 188406469007, $22.800) y la app mostró "Viaje pagado / Aprobado". La tarifa coincide con el cálculo: 3.500 + 11,3 km × 1.200 + 23 min × 250 = 22.810 → 22.800.
+  - El cobro comprobó que la APK llega al backend por `http` en la red local.
+  - Sin probar en la APK: el espacio de la barra de navegación (`MainDrawer.js`); entra en el próximo build.
+
+- **Aprendizaje:**
+  - Lo que funciona en Expo Go no garantiza que funcione en la APK: el build de release compila y optimiza el código nativo. Cuando una app se cierra al abrir, el error real está en `adb logcat`, no en la pantalla.
+  - Las llaves de Google se protegen restringiéndolas por app (paquete + SHA-1) y por API, y con una alerta de presupuesto, porque una llave dentro de una APK se puede extraer.
