@@ -809,3 +809,114 @@ Ya monté el esqueleto de navegación que revisamos y lo probé en mi iPhone con
   - Firestore muestra los cambios en el celular antes de que el servidor los acepte; una acción importante debe esperar la confirmación.
   - Un arreglo puede sonar bien y no resolver el problema (`isMounted` no evita una segunda escritura).
   - La tarifa que el cliente envía se valida en el servidor con la misma fórmula, no se confía en el celular.
+
+### Entrada #13
+
+- **Fecha:** 12/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramienta:** Claude (Anthropic): diseño, código, guía de configuración de Mercado Pago y diagnóstico de errores. Las revisiones de Gemini están en las entradas #14 y #15.
+- **Objetivo:** Cobrar los viajes con Mercado Pago Checkout Pro en modo de prueba (enunciado G1–G12): un backend que crea el cobro con el Access Token secreto y lo verifica, y la app que abre el checkout y muestra el resultado en la pantalla Cobro y resumen (S4).
+
+- **Prompt (textual, mensajes principales):**
+  1. "acepto todas las recomendadas estan bien" (verificar el pago al volver del checkout, sin webhook; el iPhone llega al backend por la misma red Wi-Fi; abrir el checkout con `expo-web-browser`; el saldo se calcula desde los viajes).
+  2. "dame el promt para gemini y el paso a paso para el mercado pago".
+  3. "aporbado las recomednaciones" (dividir la app en 2 commits; poder salir del resumen sin cobrar, con aviso; `openBrowserAsync`; error suave si falta la URL del backend).
+  4. Durante el error 403: "pealo tu, para que no nos eqivoquemos mas" (ver Incidente).
+
+- **Resumen:** Claude propuso que la app nunca hable con Mercado Pago: el backend (Node 22 + Express 5) crea la preferencia con el monto guardado en Firestore y `external_reference` = id del viaje, y al volver del checkout busca el pago y marca el viaje como pagado solo si el monto y la moneda coinciden. La configuración de Mercado Pago tuvo tropiezos (errores del panel y un 403) que se resolvieron con cuentas de prueba y revisando el token del `.env`.
+
+- **Qué se usó / modificó / descartó:**
+  - **Se usó:** rutas `POST /api/payments/start` y `/verify` que exigen el idToken de Firebase (`verifyIdToken`) y que el viaje sea del conductor, esté `completed`, sea por Mercado Pago y tenga tarifa entera. El monto sale de Firestore, nunca de la app.
+  - **Se usó:** `summarizePayments`: aprobado solo si el monto y la moneda (COP) coinciden; `pending`, `in_process` y `authorized` cuentan como pendiente; si no, rechazado.
+  - **Se usó:** llamadas a Mercado Pago con límite de tiempo y sin reintento (un POST repetido crearía dos cobros).
+  - **Se usó:** API de Preferences aunque el panel avisa que "será descontinuada pronto": sigue funcionando y es la de Checkout Pro; el reemplazo (Orders) quedó anotado en el README del backend.
+  - **Se usó:** en la app, `paymentService` llama al backend con el idToken y un límite de 15 s; `isValidCheckoutUrl` solo abre enlaces `https` de Mercado Pago; `openBrowserAsync` verifica solo al cerrar en iOS y hay botón "Verificar pago" (en Android la promesa termina al abrir).
+  - **Se modificó:** el Jest de la app tomaba `backend/test/payment.test.js` (escrito para `node --test`) y fallaba; se agregó `"/backend/"` a `testPathIgnorePatterns`.
+  - **Se descartó:** webhook de Mercado Pago: necesita una URL pública y el backend solo vive en la red local del PC.
+
+- **Configuración de Mercado Pago (problemas y solución):**
+  - "Activar credenciales" de prueba en la cuenta real mostraba "Algo salió mal" (códigos DXT40). Se usaron **cuentas de prueba** (vendedor y comprador) y las credenciales de producción del vendedor de prueba, que ya estaban activas (no mueven dinero real).
+  - La pantalla "Credenciales de prueba" del vendedor de prueba también falló (DXT15).
+  - El backend recibía **403** (`PA_UNAUTHORIZED_RESULT_FROM_POLICIES`). Claude primero lo atribuyó a un bloqueo de red porque `/sites/MCO` también daba 403; era un error de diagnóstico: esa ruta ya exige token. La causa real: el token del `.env` tenía 89 caracteres y el real 75 (se pegaron caracteres de más). Se reemplazó la línea con `sed` y Mercado Pago respondió 201. Además, el servidor debe reiniciarse para leer el `.env` nuevo.
+
+- **Incidente de seguridad:** para corregir el `.env`, el Access Token de la cuenta **vendedor de prueba** se pegó en el chat. No mueve dinero real, pero se considera expuesto: se renovará en el panel y nunca se sube al repositorio (`backend/.env` está en `.gitignore`).
+
+- **Archivos y commits:**
+  - Backend: `backend/src/server.js`, `routes/payments.js`, `middleware/requireAuth.js`, `services/mercadoPagoService.js`, `services/tripPaymentService.js`, `utils/payment.js`, `config.js`, `firebaseAdmin.js`, `test/payment.test.js`, `.env.example`, `README.md`, `package.json` — commit `5147c32`.
+  - App: `src/config/api.js`, `src/utils/paymentRequest.js` y su prueba, `src/services/paymentService.js`, `src/screens/main/TripSummaryScreen.js`, `.env.example`, `app.json`, `package.json` — commit `e6a6924`.
+
+- **Verificación:**
+  - Backend: `npm test` con `node --test`: 9 pruebas pasando. Con `curl`: sin token → 401 "Falta la sesión."; token falso → 401 "Sesión inválida o vencida.". `/health` respondió `{"ok":true}` desde el iPhone.
+  - App: `npm test`: 91 pruebas pasando (7 nuevas de `paymentRequest`).
+  - iPhone con el comprador de prueba y la Mastercard de prueba:
+    1. Titular APRO: Mercado Pago aprobó la operación 188252034061; la app mostró "Viaje pagado" y "Aprobado"; en Firestore el viaje quedó `paid`, `paymentStatus: "approved"`, `paymentId: "188252034061"` (el mismo número) y `paidAt`. Tarifa 6,2 km / 15 min: 3.500 + 7.440 + 3.750 = 14.690 → 14.700, igual al cobro de Mercado Pago.
+    2. Titular OTHE: Mercado Pago rechazó la operación 189325067980; la app mostró "El pago fue rechazado" y el botón para reintentar; el viaje siguió `completed` con `paymentStatus: "rejected"` y sin `paidAt`.
+    3. Reintentar en el viaje rechazado y cerrar sin pagar: siguió en "Rechazado", porque el único pago de ese viaje es el rechazado.
+  - Sin probar todavía: "Verificar pago" en un viaje nuevo cerrado sin pagar.
+
+- **Aprendizaje:**
+  - El secreto de una pasarela de pago vive solo en el servidor; la app pide el cobro y nunca decide el monto.
+  - Un pago se confirma preguntándole a la pasarela y revisando el monto, no confiando en lo que diga la app.
+  - Ante un error de una API, primero se mira la respuesta completa; un 403 no siempre es de red.
+  - Un secreto pegado en un chat se considera expuesto y se renueva.
+
+### Entrada #14
+
+- **Fecha:** 12/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramientas:** Gemini (Google) para la revisión crítica; Claude (Anthropic) para revisar la respuesta de Gemini contra la documentación oficial.
+- **Objetivo:** Revisar el backend de pagos (commit `5147c32`) antes de montarlo: servidor Express, autenticación, servicio de Mercado Pago y reglas del cobro.
+
+- **Prompt a Gemini (resumen fiel; el texto completo se entregó en el chat y no quedó guardado):** revisor de código crítico de un backend Node 22 + Express 5 que cobra con Mercado Pago Checkout Pro (Colombia, COP), sustentando cada punto con documentación oficial y dando archivo, línea y cambio mínimo. Se adjuntó el código de `server.js`, `routes/payments.js`, `middleware/requireAuth.js`, `services/mercadoPagoService.js`, `services/tripPaymentService.js`, `utils/payment.js` y sus pruebas, con 6 preguntas:
+  1. ¿El body de `POST /checkout/preferences` es correcto para COP? ¿Se usa `sandbox_init_point` con token `TEST-`? ¿`/v1/payments/search` con `external_reference` devuelve los pagos? ¿Los nombres de los campos y estados son correctos?
+  2. Seguridad: verificación del token, validación del viaje; ¿falta idempotencia, rate limit o `X-Idempotency-Key`?
+  3. Express 5: ¿el manejo de errores async es correcto? ¿`express.json({ limit: '10kb' })` y escuchar en `0.0.0.0` tienen riesgo en la red local?
+  4. Condiciones de carrera: ¿qué pasa si se toca "Cobrar" dos veces o `verify` corre dos veces a la vez?
+  5. ¿`AbortSignal.timeout` en Node 22 y no reintentar el POST son correctos?
+  6. ¿Qué caso de prueba falta?
+- **Mensaje de aprobación:** "aprobado".
+
+- **Respuesta de Gemini y decisión:**
+  - **Se aceptó:** el body de la preferencia, la búsqueda por `external_reference`, los nombres de estados, `requireAuth`, el límite de `10kb`, `0.0.0.0` y `AbortSignal.timeout` sin reintento.
+  - **Se corrigió (Gemini dijo que estaba bien):** usar `sandbox_init_point` con tokens `TEST-`. La referencia oficial de "Crear preferencia" dice "Do not use this parameter. For integration testing, use init_point"; ahora se usa siempre `init_point`.
+  - **Se modificó (riesgo real, otro arreglo):** dos `verify` a la vez podían dejar el viaje `paid` con `paymentStatus: "pending"`. Gemini propuso llamar a Mercado Pago dentro de una transacción de Firestore; la documentación de Firestore indica que las transacciones en servidor bloquean los documentos que leen y se reintentan, así que el documento quedaría bloqueado hasta 10 s y Mercado Pago se llamaría otra vez; además su código quitaba validaciones. Se consulta Mercado Pago fuera y se escribe con una transacción corta (`updateIfCompleted`) que solo actúa si el viaje sigue `completed`.
+  - **Se descartó:** `X-Idempotency-Key` en la preferencia: la referencia de `/checkout/preferences` no lo documenta, y una preferencia de más no causa daño (todas llevan el id del viaje). El doble toque se evita en la app.
+  - **Se aceptó con ajuste:** la prueba que faltaba; se agregó "aprobado por otro monto y otro en proceso → pendiente, no aprobado".
+
+- **Verificación:** `npm test` (`node --test`): 9 pruebas pasando. Simulación con Firestore falso: `start` deja `pending`, `verify` aprobado deja `paid`, un `verify` atrasado que ve `pending` no pisa el `paid`, y `start` después de pagado responde 409.
+
+- **Aprendizaje:**
+  - Un revisor de IA puede decir "correcto según la documentación" sin que lo sea: se lee la documentación oficial.
+  - Una transacción no debe esperar a un servicio externo.
+
+### Entrada #15
+
+- **Fecha:** 12/11/2026
+- **Integrante:** Fray Sebastián Benitez
+- **Herramientas:** Gemini (Google) para la revisión crítica; Claude (Anthropic) para revisar la respuesta de Gemini.
+- **Objetivo:** Revisar el cobro con Mercado Pago en la app (commit `e6a6924`) antes de montarlo: llamada al backend con el token de sesión, apertura del checkout y verificación.
+
+- **Prompt a Gemini (textual, inicio):** "Actúa como revisor de código CRÍTICO de una app React Native (Expo SDK 58, JavaScript, React 19, React Native 0.88, Expo Go en iPhone) que cobra viajes con Mercado Pago Checkout Pro a través de un backend propio. Sustenta cada observación con documentación oficial (Expo, React Native, Firebase JS SDK, MDN, Mercado Pago) y di explícitamente si algo depende de la versión. Si algo está bien, dilo; no propongas cambios por cambiar. Para cada problema da: archivo, línea aproximada, por qué es un problema real y el cambio mínimo." + contexto (rutas del backend, el token de Mercado Pago solo en el backend, sin webhook, decisiones ya tomadas), el código de `api.js`, `paymentRequest.js`, `paymentService.js` y la lógica de `TripSummaryScreen`, y 8 preguntas:
+  1. ¿`openBrowserAsync` resuelve al cerrar en iOS y enseguida (`opened`) en Android? ¿Funciona en Expo Go?
+  2. ¿El timeout con `AbortController` cancela la petición en Hermes? ¿Problemas con `response.json()` después de un abort?
+  3. ¿`getIdToken()` sin `forceRefresh` devuelve un token válido? ¿Es correcto `auth.currentUser`?
+  4. ¿La expresión regular de `isValidCheckoutUrl` impide abrir dominios ajenos? ¿Riesgo de enviar el idToken por http en la red local?
+  5. ¿Expo Go en iPhone puede hacer `fetch` a `http://192.168.x.x:3000`? ¿Qué cambia en un APK de Android?
+  6. ¿`isBusyRef` + `isSending` cubren el doble toque? ¿setState después de desmontar?
+  7. ¿Los mensajes y botones dejan reintentar de forma clara?
+  8. ¿Qué prueba importante falta?
+- **Mensaje de aprobación:** "aprbado".
+
+- **Respuesta de Gemini y decisión:**
+  - **Se aceptó:** el comportamiento de `openBrowserAsync` (coincide con la documentación de Expo SDK 58), `AbortController`, `getIdToken()`, `isBusyRef` + `isSending` y los mensajes de reintento.
+  - **Se modificó (por otra razón):** Gemini dijo que `https://mercadopago.com.co.evil.com/` pasaba la validación. Se ejecutó la expresión regular con sus ejemplos y todos daban `false`. El problema real era que aceptaba cualquier país (`mercadopago.com.xx`): se restringió a `mercadopago.com` y `mercadopago.com.co`, y se agregaron sus casos de prueba (dominio falso, `@evil.com` y Mercado Pago de otro país).
+  - **Se descartó:** `isMountedRef` para "setState en un componente desmontado": React 18 eliminó esa advertencia y abrir el navegador no desmonta la pantalla.
+  - **Se descartó:** el "Incorrecto" sobre `response.json()` después de un abort: el abort cae en el `catch` del `fetch` y nunca llega a `.json()` (Gemini lo reconoce en su propia respuesta).
+  - **Se descartó:** configurar App Transport Security en `app.json` para usar http: esa configuración no se aplica en Expo Go. La prueba en el iPhone con `http://IP-DEL-PC:3000` funcionó.
+  - **Se anotó para la rama del APK (correcto):** Android bloquea el tráfico http en un APK, y el idToken viaja sin cifrar en la red local; en producción se exige https.
+
+- **Verificación:** `npm test`: 91 pruebas pasando (7 de `paymentRequest`). Pagos reales de prueba en el iPhone: aprobado (APRO) y rechazado (OTHE), detallados en la entrada #13.
+
+- **Aprendizaje:**
+  - Una afirmación de seguridad se comprueba ejecutando el código con los mismos ejemplos, no solo leyéndola.
+  - Lo que aplica a un build propio (`app.json`) no siempre aplica a Expo Go.

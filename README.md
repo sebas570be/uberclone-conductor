@@ -35,7 +35,10 @@ npm test
 
 ## Variables de entorno
 
-Las llaves secretas (Mercado Pago, Google) **no se suben al repositorio**: van en archivos `.env`, que están en el `.gitignore`. El archivo `.env.example` con los nombres de las variables (sin valores) se agrega cuando se configuren los servicios externos.
+Las llaves **no se suben al repositorio**: van en archivos `.env`, que están en el `.gitignore`. Cada `.env.example` tiene los nombres de las variables sin valores; se copia como `.env` y se completa.
+
+- **`.env` (raíz, la app):** configuración web de Firebase, Cloudinary (upload preset sin firma) y `EXPO_PUBLIC_API_URL`, la dirección del backend de pagos (en Expo Go, `http://IP-DEL-PC:3000`). Ninguno es secreto.
+- **`backend/.env`:** ruta de la llave de la cuenta de servicio de Firebase y `MP_ACCESS_TOKEN` de Mercado Pago. **Son secretos**: solo viven en el PC. Ver [backend/README.md](backend/README.md).
 
 ## Estructura del proyecto
 
@@ -70,6 +73,15 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - **Segundo plano:** con la app minimizada, iOS pausa los temporizadores de JavaScript y el envío se detiene hasta volver a abrirla. Enviar en segundo plano exige tareas en segundo plano y permiso "Siempre", que quedan fuera de Expo Go.
 - **Último estado del interruptor:** se guarda en AsyncStorage (`@uberclone_conductor:isAvailable:<uid>`), porque es una preferencia y no un dato sensible.
 
+## Cobro (Mercado Pago y efectivo)
+
+- **Pantalla Cobro y resumen:** al finalizar el viaje muestra tarifa, comisión (20 %), ganancia y estado del pago (Pendiente, Aprobado, Rechazado o Efectivo). Escucha el viaje en tiempo real: cambia sola cuando se cobra.
+- **Efectivo:** "Recibí el efectivo" marca el viaje `paid` con `paymentStatus: "cash"`. Las reglas de Firestore solo lo permiten al conductor del viaje, si el viaje es en efectivo y está `completed`.
+- **Mercado Pago (Checkout Pro, modo de prueba):** la app nunca habla con Mercado Pago. Le pide al backend (`backend/`, `npm start`) que cree el cobro, con el monto guardado en Firestore. El checkout se abre dentro de la app con `expo-web-browser`, y al cerrarlo el backend verifica el pago (monto y moneda) y marca el viaje como pagado. Un viaje de Mercado Pago no se puede marcar pagado desde la app.
+- **Sin webhook:** el backend vive en la red local del PC, sin URL pública; el pago se verifica al volver del checkout, y también con el botón "Verificar pago".
+- **Salir sin cobrar:** se permite con un aviso; el viaje queda `completed` (por cobrar).
+- **Limitación conocida:** en desarrollo, la app llama al backend por `http` en la red local. En un APK de Android el tráfico `http` está bloqueado, y en producción el token de sesión debe viajar por `https`.
+
 ## Estado del desarrollo
 
 - [x] Arquitectura por capas
@@ -80,7 +92,7 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - [x] Disponibilidad y ubicación en tiempo real
 - [x] Solicitudes con tiempo límite
 - [x] Navegación al punto de recogida y al destino
-- [ ] Cobro con Mercado Pago y en efectivo
+- [x] Cobro con Mercado Pago y en efectivo
 - [ ] Historial y resumen de ganancias
 
 ## Uso de IA
