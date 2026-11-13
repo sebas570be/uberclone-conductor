@@ -8,7 +8,7 @@
 //   npm run solicitud -- mercadopago   → fuerza Mercado Pago
 // AI-assisted: see docs/AI_LOG.md #10
 const { FieldValue } = require('firebase-admin/firestore');
-const { db } = require('../src/firebaseAdmin');
+const { db, messaging } = require('../src/firebaseAdmin');
 const { CONFIG } = require('../src/config');
 const { getDrivingRoute } = require('../src/services/routeService');
 const { reverseGeocode } = require('../src/services/geocodingService');
@@ -20,10 +20,11 @@ const {
   toTripMetrics,
   buildTripRequest,
 } = require('../src/utils/tripRequest');
+const { buildTripRequestMessage, isTokenGone } = require('../src/utils/pushMessage');
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// Primer conductor que cumpla TODO: Disponible, ubicación de hace menos de 30 s,
+// Primer conductor que cumpla TODO: Disponible, ubicación de hace menos de 5 min,
 // registro "approved", categoría válida y sin otro viaje activo.
 // firebase-admin se salta las reglas, por eso aquí se revisa lo mismo que ellas exigen.
 // Devuelve también POR QUÉ se descartó a cada uno, para saber qué arreglar.
@@ -41,7 +42,7 @@ async function findAvailableDriver(now) {
     const updatedAtDate = updatedAt?.toDate?.();
     if (!isFreshLocation(updatedAtDate, now, CONFIG.staleAfterMs)) {
       const age = updatedAtDate ? `hace ${Math.round((now - updatedAtDate) / 1000)} s` : 'sin fecha';
-      skip(driverId, `ubicación vieja (${age}); ¿la app está abierta y en primer plano?`);
+      skip(driverId, `ubicación vieja (${age}); abre la app y vuelve a ponerte Disponible`);
       continue;
     }
     if (!isValidPoint(position)) {
@@ -75,9 +76,41 @@ async function findAvailableDriver(now) {
       continue;
     }
 
-    return { driver: { driverId, category, position }, skipped };
+    return { driver: { driverId, category, position, language: driver.language }, skipped };
   }
   return { driver: null, skipped };
+}
+
+// Notificación push al conductor (enunciado §7): avisa aunque la app esté en
+// segundo plano. El token lo guarda la app en pushTokens/{uid} (solo la APK de
+// Android). Si falla, la solicitud igual quedó creada: la app la ve al abrirse.
+async function notifyDriver(driver, tripId, metrics) {
+  const tokenDoc = await db.collection('pushTokens').doc(driver.driverId).get();
+  const token = tokenDoc.data()?.token;
+  if (!token) {
+    console.log('Sin notificación: el conductor no tiene token (Expo Go, iPhone o permiso negado).');
+    return;
+  }
+  const message = buildTripRequestMessage({
+    token,
+    tripId,
+    language: driver.language,
+    distanceKm: metrics.distanceKm,
+    durationMin: metrics.durationMin,
+    ttlMs: CONFIG.pushTtlMs,
+    channelId: CONFIG.pushChannelId,
+  });
+  try {
+    await messaging.send(message);
+    console.log('Notificación push enviada.');
+  } catch (error) {
+    if (isTokenGone(error)) {
+      await tokenDoc.ref.delete();
+      console.log('El token ya no sirve (¿app desinstalada?): se borró.');
+    } else {
+      console.log(`No se pudo enviar la notificación: ${error.code ?? error.message}`);
+    }
+  }
 }
 
 async function main() {
@@ -130,6 +163,8 @@ async function main() {
   // mostrar sin exponer ubicaciones reales.
   console.log(`Solicitud creada: trips/${tripRef.id}`);
   console.log(`${metrics.distanceKm} km · ${metrics.durationMin} min · ${driver.category} · ${paymentMethod}`);
+
+  await notifyDriver(driver, tripRef.id, metrics);
 }
 
 main().catch((error) => {
