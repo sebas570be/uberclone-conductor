@@ -82,6 +82,15 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - **Salir sin cobrar:** se permite con un aviso; el viaje queda `completed` (por cobrar).
 - **Limitación conocida:** en desarrollo, la app llama al backend por `http` en la red local. En un APK de Android el tráfico `http` está bloqueado, y en producción el token de sesión debe viajar por `https`.
 
+## Historial y ganancias
+
+- **Ganancias:** Hoy, Semana (lunes a domingo) y Mes, con viajes pagados, total facturado, comisiones, propinas, ganancia neta y promedio por viaje. Se calculan en el hook `useEarnings` con `useMemo`.
+- **Solo cuenta el dinero real:** los totales y el saldo usan solo los viajes `paid`. Los viajes que terminaron sin pagar se muestran aparte como **"Pendiente de pago"** y no se suman. En una app real la plataforma le cobraría al pasajero; queda fuera del alcance porque la app del pasajero no existe.
+- **Saldo con la plataforma:** los viajes pagados con Mercado Pago suman la ganancia del conductor (la plataforma recibió el dinero); los pagados en efectivo restan la comisión (el conductor recibió el dinero). Puede quedar negativo.
+- **Historial:** una sola escucha en tiempo real de los viajes terminados (`completed` y `paid`). Los filtros (Hoy, Semana, Mes, Rango de fechas y método de pago) y el orden se aplican en la app con `useMemo`, sin índices compuestos en Firestore. La `FlatList` muestra 20 viajes y carga 20 más al llegar al final.
+- **Detalle del viaje:** ruta dibujada con `Polyline` desde la ruta guardada del viaje, distancia, duración, tarifa, comisión, propina y ganancia. La calificación aparece como "Sin calificación" porque no hay app del pasajero que califique.
+- Los viajes cancelados o rechazados no aparecen: no cobran nada.
+
 ## Estado del desarrollo
 
 - [x] Arquitectura por capas
@@ -93,7 +102,7 @@ Protecciones del preset: carpeta fija, solo `jpg` y `png`, sin sobrescribir y co
 - [x] Solicitudes con tiempo límite
 - [x] Navegación al punto de recogida y al destino
 - [x] Cobro con Mercado Pago y en efectivo
-- [ ] Historial y resumen de ganancias
+- [x] Historial y resumen de ganancias
 
 ## Uso de IA
 
