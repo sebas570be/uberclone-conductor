@@ -3,6 +3,7 @@
 // antiguo, con filtros por periodo (Hoy, Semana, Mes, Rango de fechas) y por
 // método de pago. FlatList muestra 20 y carga 20 más al llegar al final (HI7).
 // Los filtros se aplican en la app con useMemo (sin nuevas consultas).
+// Al tocar un viaje se abre su detalle (HI4).
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, Pressable, FlatList, ActivityIndicator, StyleSheet } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
@@ -53,11 +54,16 @@ function OptionRow({ options, selected, onSelect }) {
 }
 
 // Un viaje de la lista (HI3): fecha y hora, origen → destino, categoría,
-// tarifa, ganancia y estado del pago.
-function TripItem({ trip }) {
+// tarifa, ganancia y estado del pago. Al tocarlo se abre el detalle.
+function TripItem({ trip, onPress }) {
   const isUnpaid = trip.status === TRIP_STATUS.COMPLETED;
   return (
-    <View style={styles.item}>
+    <Pressable
+      style={styles.item}
+      onPress={() => onPress(trip.id)}
+      accessibilityRole="button"
+      accessibilityHint="Abre el detalle del viaje"
+    >
       <View style={styles.itemHeader}>
         <Text style={styles.itemDate}>{formatDateTime(new Date(trip.completedAtMs))}</Text>
         <Text style={[styles.badge, isUnpaid ? styles.badgeUnpaid : styles.badgePaid]}>{historyStatusLabel(trip)}</Text>
@@ -72,11 +78,11 @@ function TripItem({ trip }) {
         <Text style={styles.itemFare}>Tarifa {formatCop(trip.fare)}</Text>
         <Text style={styles.itemEarnings}>Ganancia {formatCop(trip.driverEarnings)}</Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
-export default function HistoryScreen() {
+export default function HistoryScreen({ navigation }) {
   const { trips, isLoading, hasError } = useFinishedTrips();
   const [period, setPeriod] = useState(PERIOD.MONTH);
   const [paymentMethod, setPaymentMethod] = useState('all');
@@ -114,7 +120,8 @@ export default function HistoryScreen() {
     setVisibleCount((count) => Math.min(count + HISTORY.pageSize, filteredTrips.length));
   }, [filteredTrips.length]);
 
-  const renderItem = useCallback(({ item }) => <TripItem trip={item} />, []);
+  const openDetail = useCallback((tripId) => navigation.navigate('TripDetail', { tripId }), [navigation]);
+  const renderItem = useCallback(({ item }) => <TripItem trip={item} onPress={openDetail} />, [openDetail]);
 
   if (isLoading) {
     return (
@@ -225,6 +232,7 @@ const styles = StyleSheet.create({
   },
   rangeFields: {
     flexDirection: 'column',
+    marginBottom: 12, // espacio entre "Hasta" (y su error) y los botones de método de pago
   },
   rangeField: {
     flex: 1,
