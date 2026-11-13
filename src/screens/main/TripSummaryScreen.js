@@ -3,13 +3,18 @@
 // y estado del pago. Escucha el viaje en tiempo real: cuando se cobra (botón
 // "Recibí el efectivo" aquí, o Mercado Pago desde el backend) la pantalla
 // cambia sola.
+// Mercado Pago: el backend crea el cobro, el checkout se abre dentro de la app
+// (expo-web-browser) y al cerrarlo se le pide al backend que lo verifique.
 // Se puede salir sin cobrar, con aviso: el viaje queda en "completed" (por
 // cobrar) y el conductor puede seguir trabajando.
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, Pressable, ScrollView, ActivityIndicator, Alert, StyleSheet } from 'react-native';
 import { usePreventRemove } from '@react-navigation/native';
-import { TRIP_STATUS } from '../../config/tripRequest';
+import * as WebBrowser from 'expo-web-browser';
+import { TRIP_STATUS, PAYMENT_STATUS } from '../../config/tripRequest';
 import { subscribeToTrip, collectCash } from '../../services/tripService';
+import { startMercadoPagoPayment, verifyMercadoPagoPayment } from '../../services/paymentService';
+import { getPaymentErrorMessage, getVerifyMessage } from '../../utils/paymentRequest';
 import { parseTripSummary, formatCop, paymentMethodLabel, paymentStatusLabel } from '../../utils/tripRequestData';
 
 function DetailRow({ label, value }) {
@@ -36,6 +41,10 @@ export default function TripSummaryScreen({ route, navigation }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSending, setIsSending] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
+  // useRef: evita dos cobros a la vez (doble toque) sin esperar a que se
+  // vuelva a dibujar la pantalla.
+  const isBusyRef = useRef(false);
 
   // Viaje en tiempo real. Los datos se revisan con parseTripSummary antes de
   // mostrarlos: si no cuadran, se muestra un error en vez de romper la app.
@@ -93,6 +102,46 @@ export default function TripSummaryScreen({ route, navigation }) {
     ]);
   }, [trip]);
 
+  // Ejecuta una acción de Mercado Pago mostrando carga y error, una a la vez.
+  const runPaymentAction = useCallback(async (action) => {
+    if (isBusyRef.current) return;
+    isBusyRef.current = true;
+    setIsSending(true);
+    setErrorMessage('');
+    setInfoMessage('');
+    try {
+      await action();
+    } catch (error) {
+      setErrorMessage(getPaymentErrorMessage(error));
+    } finally {
+      isBusyRef.current = false;
+      setIsSending(false);
+    }
+  }, []);
+
+  // Preguntar al backend cómo va el pago. Si está aprobado, el backend marca
+  // el viaje como pagado y esta pantalla cambia sola (onSnapshot).
+  const verifyPayment = useCallback(async () => {
+    const paymentStatus = await verifyMercadoPagoPayment(trip.id);
+    setInfoMessage(getVerifyMessage(paymentStatus));
+  }, [trip]);
+
+  // "Cobrar con Mercado Pago": el backend crea el cobro y la app abre el
+  // checkout. En iOS openBrowserAsync termina cuando se cierra el navegador:
+  // ahí se verifica solo. En Android termina apenas se abre ('opened'): se
+  // verifica con el botón "Verificar pago".
+  const handlePayWithMercadoPago = useCallback(() => {
+    runPaymentAction(async () => {
+      const checkoutUrl = await startMercadoPagoPayment(trip.id);
+      const result = await WebBrowser.openBrowserAsync(checkoutUrl);
+      if (result.type !== WebBrowser.WebBrowserResultType.OPENED) await verifyPayment();
+    });
+  }, [trip, runPaymentAction, verifyPayment]);
+
+  const handleVerifyPayment = useCallback(() => {
+    runPaymentAction(verifyPayment);
+  }, [runPaymentAction, verifyPayment]);
+
   const handleGoHome = useCallback(() => {
     navigation.popToTop();
   }, [navigation]);
@@ -117,6 +166,9 @@ export default function TripSummaryScreen({ route, navigation }) {
   }
 
   const canCollectCash = trip.paymentMethod === 'cash' && trip.status === TRIP_STATUS.COMPLETED;
+  const canPayWithMercadoPago = trip.paymentMethod === 'mercadopago' && trip.status === TRIP_STATUS.COMPLETED;
+  // Ya se creó el cobro (el backend dejó paymentStatus en pending): se puede verificar.
+  const canVerify = canPayWithMercadoPago && trip.paymentStatus === PAYMENT_STATUS.PENDING;
   const commissionLabel =
     trip.commissionRate === null ? 'Comisión' : `Comisión (${Math.round(trip.commissionRate * 100)} %)`;
 
@@ -156,6 +208,7 @@ export default function TripSummaryScreen({ route, navigation }) {
       </View>
 
       {errorMessage ? <Text style={styles.error}>{errorMessage}</Text> : null}
+      {infoMessage ? <Text style={styles.info}>{infoMessage}</Text> : null}
 
       {canCollectCash ? (
         <Pressable
@@ -166,6 +219,29 @@ export default function TripSummaryScreen({ route, navigation }) {
           accessibilityLabel={`Recibí el efectivo, ${formatCop(trip.fare)}`}
         >
           {isSending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Recibí el efectivo</Text>}
+        </Pressable>
+      ) : null}
+
+      {canPayWithMercadoPago ? (
+        <Pressable
+          style={[styles.button, styles.primaryButton, isSending && styles.disabled]}
+          onPress={handlePayWithMercadoPago}
+          disabled={isSending}
+          accessibilityRole="button"
+          accessibilityLabel={`Cobrar con Mercado Pago, ${formatCop(trip.fare)}`}
+        >
+          {isSending ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryText}>Cobrar con Mercado Pago</Text>}
+        </Pressable>
+      ) : null}
+
+      {canVerify ? (
+        <Pressable
+          style={[styles.button, styles.secondaryButton, isSending && styles.disabled]}
+          onPress={handleVerifyPayment}
+          disabled={isSending}
+          accessibilityRole="button"
+        >
+          <Text style={styles.secondaryText}>Verificar pago</Text>
         </Pressable>
       ) : null}
 
@@ -271,6 +347,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     color: '#DC2626',
+  },
+  info: {
+    marginBottom: 12,
+    fontSize: 14,
+    textAlign: 'center',
+    color: '#92400E',
   },
   button: {
     alignItems: 'center',
